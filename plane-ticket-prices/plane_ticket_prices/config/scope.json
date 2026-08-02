@@ -1,0 +1,48 @@
+{
+  "scopes": [
+    {
+      "name": "HKG-DXB-Winter",
+      "from_airport": "HKG",
+      "to_airport": "DXB",
+
+      "depart_from": "2026-12-18",
+      "depart_to": "2026-12-20",
+      "return_from": "2026-12-22",
+      "return_to": "2026-12-28",
+
+      "max_stops": 0,
+      "seat": "economy",
+      "min_nights": 5,
+      "max_nights": 7,
+      "adults": 1,
+      "children": 0,
+      "currency": "HKD",
+      "language": "en",
+
+      "max_outbounds_per_pair": 6,
+      "max_searches_per_run": 100
+    },
+    {
+      "name": "HKG-PEN-Winter",
+      "from_airport": "HKG",
+      "to_airport": "PEN",
+
+      "depart_from": "2026-12-18",
+      "depart_to": "2026-12-20",
+      "return_from": "2026-12-22",
+      "return_to": "2026-12-26",
+
+      "max_stops": 0,
+      "seat": "economy",
+      "min_nights": 4,
+      "max_nights": 5,
+      "adults": 1,
+      "children": 0,
+      "currency": "HKD",
+      "language": "en",
+
+      "max_outbounds_per_pair": 6,
+      "max_searches_per_run": 100
+    }
+  ]
+}

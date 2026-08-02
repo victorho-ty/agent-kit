@@ -1,5 +1,5 @@
 [project]
-name = "hermes-household-expenses"
+name = "household-expenses"
 version = "1.0.0"
 description = "Household expense tracking tools for a Hermes Agent skill"
 requires-python = ">=3.11"

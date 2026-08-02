@@ -1,0 +1,29 @@
+[project]
+name = "plane-ticket-prices"
+version = "0.1.0"
+description = "Google Flights round-trip price tracking tools for a Hermes Agent skill"
+requires-python = ">=3.11"
+
+dependencies = [
+    "playwright>=1.58.0",
+    "fast-flights>=3.0.2",
+    "pandas>=2.0.0",
+]
+
+[project.scripts]
+ticket-price-tracker = "ticket_price_tracker.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["ticket_price_tracker", "config"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]

@@ -11,7 +11,7 @@ belongs to. Everything else goes through the CLI.
 
 ## Setup
 
-Bundle root: `/home/vicho29/projects/hermes/hermes-household-expenses`.
+Bundle root: `~/projects/hermes/hermes-household-expenses`.
 
 Prefer the installed console script — it works from any working directory and runs
 on the project's own virtualenv:
@@ -28,7 +28,7 @@ PATH and does not depend on the Hermes runtime venv. If the symlink is missing,
 run from the bundle root instead:
 
 ```bash
-cd /home/vicho29/projects/hermes/hermes-household-expenses
+cd ~/projects/hermes/hermes-household-expenses
 .venv/bin/python -m expense_tracker <command> [options]
 ```
 

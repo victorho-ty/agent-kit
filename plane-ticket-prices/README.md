@@ -5,9 +5,6 @@ crawler walks Google Flights for **non-stop, round-trip, economy** fares and app
 them to a SQLite database; the agent reads that series to answer "how are the Dubai
 fares trending" and "should I book now".
 
-**This is a scaffold — the crawler is not written yet.** Only the trip
-configuration is done.
-
 | Path | Status |
 |---|---|
 | `plane_ticket_prices/config/` | **done** — `TravelScope`, `date_pairs()`, `load_scopes()` and the two monitored trips |

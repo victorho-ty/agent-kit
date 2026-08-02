@@ -54,7 +54,7 @@ Output:
 
 ```json
 {
-  "images": ["~/projects/hermes/plane-ticket-prices/reports/HKG-DXB-Winter_2026-08-02.png"],
+  "images": ["~/projects/hermes/plane-ticket-prices/reports/sample.png"],
   "scopes": {
     "HKG-DXB-Winter": {
       "run_date": "2026-08-02",

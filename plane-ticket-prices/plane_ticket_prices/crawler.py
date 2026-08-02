@@ -12,8 +12,11 @@ Flow per (depart, return) date pair:
 3. Parse every aria-label on the page; keep only ``origin -> dest`` options.
 4. Dedupe to one option per (airline, departure 3h-bucket), cheapest first,
    capped at ``max_outbounds_per_pair``.
-5. For each selected outbound: reload the search, click the row, read the
-   return grid, parse ``dest -> origin`` options with their round-trip prices.
+5. For each selected outbound: click the row, read the return grid, parse
+   ``dest -> origin`` options with their round-trip prices. The first selection
+   reuses the list already on screen from step 2; the rest reload the search
+   first to get a clean list to click into. That makes the cost per pair
+   ``len(selected)`` page loads rather than ``1 + len(selected)``.
 6. Aggregate into grid cells (airline, dep_bucket) x ret_bucket and full
    itinerary rows; the caller upserts them into SQLite.
 
@@ -363,9 +366,13 @@ class Crawler:
         itineraries: list[dict] = []
         searches = 1
 
-        for outbound in selected:
-            self._goto(url)  # fresh page per outbound: deterministic, no stale DOM
-            searches += 1
+        for index, outbound in enumerate(selected):
+            # The initial load above left the browser on this pair's outbound list and
+            # reading aria-labels did not navigate, so the first selection clicks straight
+            # into it. Only subsequent selections need a fresh list to click into.
+            if index:
+                self._goto(url)  # fresh page per outbound: deterministic, no stale DOM
+                searches += 1
             try:
                 self._click_row(outbound)
                 ret_labels, _ = self._wait_for_options(scope, direction="return")

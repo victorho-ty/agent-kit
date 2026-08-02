@@ -8,17 +8,18 @@ dependencies = [
     "playwright>=1.58.0",
     "fast-flights>=3.0.2",
     "pandas>=2.0.0",
+    "matplotlib>=3.8.0",
 ]
 
 [project.scripts]
-ticket-price-tracker = "ticket_price_tracker.cli:main"
+plane-ticket-tracker = "plane_ticket_prices.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["ticket_price_tracker", "config"]
+packages = ["plane_ticket_prices", "plane_ticket_prices.config"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

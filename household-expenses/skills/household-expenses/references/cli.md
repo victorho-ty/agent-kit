@@ -1,4 +1,4 @@
-# CLI reference
+# CLI references
 
 All commands are `expense-tracker <command>` (console script on the project
 venv; fallback: `python -m expense_tracker` from the bundle root).

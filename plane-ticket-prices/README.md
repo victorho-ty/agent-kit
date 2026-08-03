@@ -5,17 +5,6 @@ crawler walks Google Flights for **non-stop, round-trip, economy** fares and app
 them to a SQLite database; the agent reads that series to answer "how are the Dubai
 fares trending" and "should I book now".
 
-**This is a scaffold — the crawler is not written yet.** Only the trip
-configuration is done.
-
-| Path | Status |
-|---|---|
-| `plane_ticket_prices/config/` | **done** — `TravelScope`, `date_pairs()`, `load_scopes()` and the two monitored trips |
-| `plane_ticket_prices/*.py` | **to build** — crawler, parser, database, CLI |
-| `skills/plane-ticket-prices/SKILL.md` | **to write** — what the agent loads at runtime |
-| `skills/plane-ticket-prices/references/cli.md` | **to write** — the command surface and exact JSON shapes |
-| `skills/plane-ticket-prices/references/google-flights.md` | **to write** — how Google Flights actually behaves, measured |
-
 ```
 plane-ticket-prices/
 ├── plane_ticket_prices/                # the package

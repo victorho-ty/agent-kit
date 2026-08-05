@@ -106,7 +106,11 @@ def mark_void(
 
 
 def extend(scope: AccountScope, coupon_id: str, new_date: str, now: datetime) -> TransitionResult:
-    """Push the expiry out, revive if expired, and re-arm the alerts."""
+    """Push the expiry out, reviving the coupon if it had already expired.
+
+    Nothing to re-arm: alerts are recomputed from ``expires_on`` each run, so a
+    new date automatically produces new alerts.
+    """
     coupon = store.get(scope, coupon_id)
     if coupon.status in ("used", "void"):
         raise IllegalTransitionError(
@@ -120,11 +124,6 @@ def extend(scope: AccountScope, coupon_id: str, new_date: str, now: datetime) ->
         "UPDATE coupon SET expires_on = ?, status = ?, expired_at = NULL, updated_at = ?"
         " WHERE id = ? AND account_id = ?",
         (new_date, new_status, clock.iso(now), coupon.id, scope.account_id),
-    )
-    # Clear the sent-set so alerts fire again against the new date.
-    scope.conn.execute(
-        "DELETE FROM alerts_sent WHERE coupon_id = ? AND account_id = ?",
-        (coupon.id, scope.account_id),
     )
     return TransitionResult(coupon.id, coupon.status, new_status, coupon.uses_remaining)
 

@@ -13,7 +13,17 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import accounts, clock, config as config_mod, db, lifecycle, purge, query, store
+from . import (
+    accounts,
+    alerts,
+    clock,
+    config as config_mod,
+    db,
+    lifecycle,
+    purge,
+    query,
+    store,
+)
 from .accounts import AccountScope
 from .errors import AccountError, CouponError, ExitCode, NotFoundError
 from .models import Coupon
@@ -138,7 +148,7 @@ def cmd_doctor(args) -> int:
     problems: list[dict] = []
 
     # Unscoped invariants: no row may reference a missing account.
-    for table in ("coupon", "media", "inbox_item", "alerts_sent"):
+    for table in ("coupon", "media", "inbox_item"):
         orphans = conn.execute(
             f"SELECT COUNT(*) FROM {table} t"
             " LEFT JOIN account a ON a.id = t.account_id WHERE a.id IS NULL"
@@ -468,6 +478,38 @@ def cmd_sweep_expiry(args) -> int:
 
 
 # --------------------------------------------------------------------------- #
+# Alerts
+# --------------------------------------------------------------------------- #
+
+
+def cmd_alerts_due(args) -> int:
+    """Unscoped by default: iterates accounts, isolating failures per account."""
+    cfg, conn = _open(args)
+    now = _now(args, cfg)
+    account_id = args.account or os.environ.get(ACCOUNT_ENV)
+    result = alerts.run(cfg, conn, now, commit=args.commit, account_id=account_id)
+
+    blocks = []
+    for group in result["groups"]:
+        blocks.append(
+            f"— {group['display_name']} (chat {group['chat_id']}) —\n"
+            + alerts.format_group(group)
+        )
+    for skip in result["skipped"]:
+        blocks.append(f"— {skip['display_name']}: {skip['due']} due but {skip['reason']}")
+    for failure in result["failures"]:
+        blocks.append(f"— {failure['display_name']}: FAILED {failure['error']}")
+
+    _emit(args, {"ok": True, **result}, "\n\n".join(blocks) or "nothing due")
+
+    # Non-zero only if every account failed — one bad account is not a run failure.
+    totals = result["totals"]
+    if totals["failed"] and not totals["accounts_with_alerts"]:
+        return int(ExitCode.ERR_DB)
+    return int(ExitCode.OK)
+
+
+# --------------------------------------------------------------------------- #
 # Purge
 # --------------------------------------------------------------------------- #
 
@@ -692,6 +734,18 @@ def _build_parser() -> argparse.ArgumentParser:
     p = scoped(sub.add_parser("sweep-expiry", help="expire past-dated coupons"))
     p.add_argument("--commit", action="store_true")
     p.set_defaults(handler=cmd_sweep_expiry)
+
+    # -- alerts ------------------------------------------------------------- #
+    alert = sub.add_parser("alerts", help="what is due for an alert").add_subparsers(
+        dest="alerts_cmd", parser_class=_with_common(common)
+    )
+    p = alert.add_parser("due", help="coupons due for an alert, grouped by account")
+    p.add_argument("--account", help="restrict to one account (default: all)")
+    p.add_argument(
+        "--commit", action="store_true",
+        help="also persist the expiry sweep (default: report only)",
+    )
+    p.set_defaults(handler=cmd_alerts_due)
 
     # -- purge -------------------------------------------------------------- #
     p = scoped(sub.add_parser("purge", help="delete used/expired coupons and orphaned media"))

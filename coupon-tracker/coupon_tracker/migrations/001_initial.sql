@@ -58,15 +58,11 @@ CREATE INDEX idx_coupon_acct_status_expiry ON coupon(account_id, status, expires
 CREATE INDEX idx_coupon_acct_media         ON coupon(account_id, media_id);
 CREATE INDEX idx_coupon_acct_dedupe        ON coupon(account_id, dedupe_key);
 
-CREATE TABLE alerts_sent (
-  account_id TEXT NOT NULL REFERENCES account(id) ON DELETE CASCADE,
-  coupon_id  TEXT NOT NULL REFERENCES coupon(id) ON DELETE CASCADE,
-  alert_kind TEXT NOT NULL,               -- 'pre_expiry' | 'expiry_day' | 'late_digest'
-  sent_at    TEXT NOT NULL,
-  PRIMARY KEY (coupon_id, alert_kind)
-);
-
-CREATE INDEX idx_alerts_account ON alerts_sent(account_id);
+-- No alerts_sent table. Alerts are recomputed from expires_on on every run, so
+-- there is no ledger to keep in sync, nothing to clear when a coupon is
+-- extended, and a run that was missed needs no catch-up logic. The repeat-rate
+-- control is alert_days_before: at the default of 1 a coupon is reported at
+-- most twice, the day before and the day it expires.
 
 CREATE TABLE inbox_item (
   id           TEXT PRIMARY KEY,

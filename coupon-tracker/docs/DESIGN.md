@@ -10,11 +10,16 @@ has acceptance tests that must pass before starting the next.
 
 **Architectural split — this decides every design question:**
 
-- **The agent (SKILL) owns ingest only**: turning a photo or messy text into structured candidate
-  records, judging ambiguous expiry dates, adjudicating near-duplicates, translating free-text
-  questions into filter specs, and relaying an explicit user instruction to purge.
+- **The agent (SKILL) owns ingest and delivery**: turning a photo or messy text into structured
+  candidate records, judging ambiguous expiry dates, adjudicating near-duplicates, translating
+  free-text questions into filter specs, relaying an explicit user instruction to purge, and sending
+  messages over the Telegram channel **Hermes** provides.
 - **Python owns everything else**: storage, predicate evaluation, expiry math, status transitions,
-  the purge mechanics, media garbage collection, Telegram I/O, alert scheduling.
+  the purge mechanics, media garbage collection, and deciding *which* coupons are due for an alert.
+- **Python never touches the network.** There is no HTTP client and no bot token in this package.
+  Hermes already owns the Telegram channel, exactly as in `household-expenses` and
+  `bus-arrival-alert`; duplicating it here would be a second thing to keep alive for no behaviour
+  we need.
 - **No LLM call is ever on the query path or the alert path.** `/active` must answer from SQLite in
   milliseconds with no network.
 
@@ -42,8 +47,10 @@ zone of the account it is being done for (`account.timezone`, default `Asia/Hong
 module may call `datetime.now()`. Pass `now` into every function that needs the current time so tests
 can freeze it.
 
-**Environment.** Python 3.11+, SQLite (stdlib `sqlite3`), WSL2 on Windows. No ORM, no web framework,
-no async. Dependencies limited to: `requests`, `python-ulid`, `PyYAML`, `pytest`, `freezegun`.
+**Environment.** Python 3.11+, SQLite (stdlib `sqlite3`). No ORM, no web framework, no async, no HTTP
+client. Dependencies limited to: `python-ulid`, `PyYAML`, `tzdata` (Windows only — it ships no system
+tz database, so `Asia/Hong_Kong` will not resolve without it), plus `pytest` and `freezegun` for
+tests.
 
 ---
 
@@ -78,12 +85,7 @@ no async. Dependencies limited to: `requests`, `python-ulid`, `PyYAML`, `pytest`
     query.py                     # filter spec -> rows
     lifecycle.py                 # status transitions, expiry sweep
     purge.py                     # on-demand purge + media GC
-    alerts.py                    # who to alert, idempotency, catch-up digest
-    telegram/
-      client.py                  # sendMessage, sendPhoto, getUpdates, answerCallback
-      poller.py                  # long-poll loop -> inbox/ + fast commands
-      handlers.py                # slash commands, inline callbacks
-      format.py                  # message templates
+    alerts.py                    # which coupons are due, grouped by account. Sends nothing.
     cli.py                       # couponctl entrypoint
     errors.py                    # closed exit-code enum
   tests/
@@ -618,101 +620,90 @@ account it asked for rather than trusting the call site.
 22  ERR_DEDUPE_COLLISION
 30  ERR_NOT_FOUND
 31  ERR_ILLEGAL_TRANSITION
-40  ERR_TELEGRAM
 50  ERR_PURGE_UNSAFE      # anomalies detected during purge
 ```
 
----
-
-## 8. Telegram surface
-
-**One bot, many users.** A single bot token serves every account; `config.telegram.bot_token` stays
-app-wide. `config.telegram.chat_id` is **removed** — the destination is `account.chat_id` (§2.1),
-because there is no longer one right answer.
-
-**Outbound** (`client.py`): thin `requests` wrapper. `sendMessage`, `sendPhoto`,
-`answerCallbackQuery`, `editMessageReplyMarkup`. Retry 3× with backoff on 5xx/429, honour
-`retry_after`. Never raise into the alert loop — log and return failure. Sends take an
-`AccountScope` and look up the chat id from it; no caller passes a raw `chat_id`, so a bug cannot
-address the wrong person's chat.
-
-**Inbound** (`poller.py`): long-poll `getUpdates` with persisted offset. It does **no extraction**.
-
-Every update is resolved **before anything else happens**:
-`from.id` → `account.telegram_user_id` → account.
-
-- Resolved → open the scope and handle the update inside it.
-- Unresolved but in `accounts.allowlist` → create the account (§2.1), then handle normally.
-- Unresolved and not allowlisted → one "this bot is private" reply, drop. Write nothing.
-
-For group chats the identity is still `from.id` (the sender), never the chat id — otherwise everyone
-in a group would share whoever spoke first. Replies go to `chat.id`; only alerts use
-`account.chat_id`.
-
-- Photo or non-command text → write file to `inbox/<account_id>/`, insert
-  `inbox_item(account_id=…, state='queued')`, reply "queued". A separate cron runs the Hermes agent
-  to drain the queue, once per account with a non-empty queue, passing `COUPONCTL_ACCOUNT`.
-- Slash commands → answered **directly from SQLite, no LLM**:
-  - `/active` — grouped by expiry urgency
-  - `/soon [n]` — expiring within n days (default 7)
-  - `/used <id>` — mark used
-  - `/review` — walk the needs_review queue
-  - `/whoami` — display name and account id; the user-facing way to confirm which account a chat is
-    talking to
-  - `/help`
-- Free-text questions → queued as `kind='text'` for the agent.
-
-All of these read through the resolved scope, so `/active` returns that user's coupons and nobody
-else's — the isolation is structural, not a filter each handler remembers to apply.
-
-There is no `/purge` command. Purging goes through conversation with the agent so the dry-run
-preview and confirmation happen naturally.
-
-There is no `/link` or `/switch` command either: re-pointing an account at a different Telegram id is
-an operator action (`couponctl account set --telegram-user`), because a self-service bind is an
-account-takeover primitive — anyone who could name your account id could attach themselves to it.
-
-**Inline keyboards.** Every alert and every `/active` entry carries `[✅ Used] [📅 Extend] [🚫 Void]`,
-callback data `use:<coupon_id>` etc. Callbacks call the same `lifecycle.mark_used` as the CLI — one
-code path. On success, edit the message in place to strike the entry through. Double-taps are no-ops.
-
-**Callback authorisation.** Callback data is attacker-controllable: a forwarded message carries its
-buttons, and the coupon id in it may belong to someone else. So the callback handler resolves the
-account from the *callback's* `from.id`, then acts through that scope — a coupon id outside it fails
-as `ERR_NOT_FOUND` and answers "that coupon is no longer available". The id in the payload is never
-trusted to imply ownership.
+`ERR_TELEGRAM` is gone with the Telegram module: nothing here can fail at the network.
 
 ---
 
-## 9. Alerts
+## 8. Telegram — Hermes's channel, not this package's
 
-`alerts.run(now, commit)` iterates accounts; `alerts.run_for_account(scope, now, commit)` does the
-work. Per account:
+**There is no Telegram module.** No bot token, no long-poll loop, no `sendMessage` wrapper, no
+`requests` dependency. Hermes already operates the channel; the skill is a pair of pure functions
+either side of it.
 
-1. `sweep_expiry(now)` first, so today's expirations are classified correctly.
-2. Candidates: status `active` and `expires_on - today <= config.alert_days_before` (**single
-   app-wide value, default 1**; no per-account and no per-coupon override).
-3. Skip any `(coupon_id, kind)` already in `alerts_sent` — the single most important bug guard here.
-   A cron double-fire or a manual test must not spam.
-4. Kinds: `pre_expiry` (N days before), `expiry_day` (expires today).
-5. **Catch-up.** If more than one calendar day of alerts is pending (machine was off), collapse into
-   one `late_digest` message rather than a burst. Coupons that expired entirely during the gap get
-   one line each, marked "⚠️ expired while you were away". The digest is per account — a four-day
-   gap across twenty accounts is twenty digests, one each, never a merged message.
-6. Send to `account.chat_id`. An account with no `chat_id` is skipped with a warning, not an error.
-7. Insert `alerts_sent` rows **only after** the Telegram send returns success.
+This matches the sibling skills rather than inventing a pattern: `household-expenses` is described as
+"Record, categorise and report household spending sent over Telegram" and contains no HTTP client at
+all; `bus-arrival-alert` emits alert lines for the agent to relay and states outright that an HTTP
+stack would be "a dependency the scheduler has to keep alive for no behaviour we need".
 
-**Fan-out discipline.** The outer loop walks accounts in a stable id order and wraps each in its own
-try/except and its own transaction: one account's Telegram failure or corrupt row must not stop the
-others from being alerted. The run summary reports per-account outcomes plus a total, and exits
-non-zero only if *every* account failed. Sends are spaced to stay inside Telegram's rate limit
-(~30 messages/second); at this message volume that is a short sleep between sends, not a queue.
+**Inbound.** Hermes hands the agent a message plus its sender id. The agent then:
 
-Cron entries (`~/.hermes/cron/`): **one** alerts + expiry-sweep entry at **08:00 HKT** (not
-midnight — a coupon expiring "today" is still usable at breakfast) that fans out over accounts
-internally, not one entry per account, which would drift out of sync with the account table. Inbox
-drain every 5 minutes, iterating accounts with queued items. **No purge entry.** Set the working
-directory explicitly in each entry — Hermes has a known CWD bug when launched from the installed CLI,
+1. Resolves the sender: `couponctl --telegram-user <id> account show`.
+   - Resolves → work in that account, passing `--telegram-user` or `--account` to every later call.
+   - `ERR_ACCOUNT` and the id is in `accounts.allowlist` → `couponctl account add --telegram-user
+     <id> --chat-id <chat> --name <first name>`, then continue.
+   - `ERR_ACCOUNT` and not allowlisted → reply "this bot is private" and stop. Write nothing: no
+     row, no file, so a stranger cannot consume storage.
+2. Photo or messy text → save into `inbox/<account_id>/`, extract, `commit-candidates` (§6).
+3. A question → answer it from `list`, `usable-now`, `show` or `review`. These are ordinary CLI
+   calls; there is no slash-command layer, because the agent reading a question is the layer.
+
+The identity is always the **sender** (`from.id`), never the chat id — in a group chat, keying on the
+chat would give everyone whoever spoke first. `account.chat_id` is only where *alerts* go.
+
+Re-pointing an account at a different Telegram id stays an operator action
+(`couponctl account set --telegram-user`): a self-service bind is an account-takeover primitive.
+
+**Purge** has no command of any kind. It goes through conversation with the agent so the dry-run
+preview and the explicit confirmation happen naturally (§5).
+
+---
+
+## 9. Alerts — Python decides, Hermes delivers
+
+`couponctl alerts due [--commit] [--account <id>]` answers one question: *which coupons are due, and
+whose are they?* It sends nothing.
+
+1. `sweep_expiry(now)` first, so a coupon that lapsed overnight is classified expired rather than
+   announced as due today. `--commit` persists the sweep; the default reports without writing.
+2. Candidates: status `active` and `today <= expires_on <= today + config.alert_days_before`
+   (**single app-wide value, default 1**; no per-account and no per-coupon override).
+3. Kinds: `expiry_day` when it expires today, `pre_expiry` otherwise.
+4. Group by account. Skip an account with no `chat_id` — a warning in `skipped`, not an error.
+
+**No sent-ledger.** Due-ness is recomputed from `expires_on` on every run. This deletes a whole class
+of machinery: no `alerts_sent` table, no cache to clear when a coupon is extended, and no catch-up
+digest — a machine that was off simply reports whatever is due when it comes back. The cost is that a
+coupon inside the window is reported once per daily run, so **`alert_days_before` is the repeat-rate
+control**: at the default of 1, a coupon produces at most two messages (the day before, and the day
+itself). Raise it to 7 and you have signed up for seven.
+
+**The payload cannot be misaddressed.** The result has no flat coupon list — only `groups`, each
+carrying the `account_id`, `display_name` and `chat_id` that its coupons belong to:
+
+```json
+{"groups": [{"account_id": "01J…", "display_name": "Horace", "chat_id": "111",
+             "coupons": [{"merchant": "…", "alert_kind": "pre_expiry", "days_left": 1, …}]}],
+ "skipped": [], "failures": [], "totals": {"accounts_with_alerts": 1, "coupons": 1}}
+```
+
+The only way to read a coupon out is through the group holding the chat id it goes to, so delivering
+one account's coupons to another's chat would take deliberate re-keying. Upstream, each group's query
+runs through an `AccountScope`, so nothing crosses accounts before grouping either.
+`alerts.format_group(group)` returns a ready-to-send body; the agent may reword it, but the facts —
+merchant, value, urgency, caveats — come from there.
+
+**Fan-out discipline.** Accounts are walked in stable id order, each in its own try/except: one
+corrupt account lands in `failures` and the rest still alert. The command exits non-zero only if
+*every* account failed.
+
+Cron entries (`~/.hermes/cron/`): **one** alerts entry at **08:00 HKT** (not midnight — a coupon
+expiring "today" is still usable at breakfast) running `couponctl alerts due --commit --json`, with
+the agent relaying each group to its own `chat_id`. It fans out over accounts internally, rather than
+one entry per account, which would drift out of sync with the account table. **No purge entry.** Set
+the working directory explicitly — Hermes has a known CWD bug when launched from the installed CLI,
 so do not rely on inheritance.
 
 ---
@@ -720,13 +711,15 @@ so do not rely on inheritance.
 ## 10. SKILL.md + reference docs (write last, from implemented behaviour)
 
 `SKILL.md` must contain:
-- When to invoke: a photo/text lands in the inbox; the user asks a coupon question the slash
-  commands cannot answer; the needs_review queue is non-empty; the user asks to purge.
-- **Account discipline, stated first because everything else depends on it.** Each invocation is for
-  exactly one account, identified by `COUPONCTL_ACCOUNT` (set by the cron entry or the poller) and
+- When to invoke: a coupon photo or message arrives over Telegram; the user asks a coupon question;
+  the needs_review queue is non-empty; the alerts cron fires; the user asks to purge.
+- **Account discipline, stated first because everything else depends on it.** Every message is for
+  exactly one account, resolved from the *sender's* Telegram id (§8) or `COUPONCTL_ACCOUNT`, and
   confirmable with `couponctl account show`. The agent reads only `inbox/<account_id>/`, passes that
   id to every command, and checks the `account_id` echoed in each `--json` reply. If the account is
   ambiguous or missing, it stops and reports rather than picking one.
+- **Alert relay:** run `couponctl alerts due --commit --json`, then send each group's message to that
+  group's own `chat_id`. Never merge groups, never send a group to any other chat.
 - Ingest procedure: state the coupon count **before** extracting, then extract; emit
   `candidates.json` with the account id; call `couponctl commit-candidates`; branch on the exit code.
 - The purge protocol from §5, verbatim: resolve account → dry-run → report (including held images) →
@@ -814,25 +807,21 @@ coupon is unchanged; `sweep-expiry` for one account leaves every other account's
 **— end of the first build pass —** M0 through M4 give a `couponctl` that can be driven entirely by
 hand. Use it before building the rest.
 
-**M5 — Alerts.** `alerts.run`, idempotency, catch-up digest, per-account fan-out.
-*Accept:* running twice in one day sends once; a 4-day clock gap produces exactly one digest;
-`alerts_sent` written only on send success (simulate a 500 and assert no row). **Fan-out:** three
-accounts each receive their own message at their own `chat_id`; an account whose send raises does not
-prevent the other two (assert both sends happened and the failure is reported); an account with no
-`chat_id` is skipped with a warning and exit 0.
+**M5 — Alerts.** `couponctl alerts due`, per-account grouping, fan-out isolation.
+*Accept, with a frozen clock:* a coupon expiring tomorrow is `pre_expiry` with `days_left: 1`, one
+expiring today is `expiry_day` with `days_left: 0`, one expiring next week is not due;
+`alert_days_before` widens the window; `used` and `needs_review` coupons are never due; a coupon that
+lapsed overnight is swept to `expired` and not announced, and `--commit` is what persists that sweep.
+**Grouping:** two accounts produce two groups, each with its own `chat_id` and only its own coupons;
+the payload has **no** flat coupon list; `--account` restricts to one; an account with no `chat_id`
+lands in `skipped` with exit 0; one account raising lands in `failures` while the others still alert.
+**No ledger:** running twice reports the same thing, a missed day needs no catch-up, and `extend`
+moves a coupon's alert with no invalidation step.
 
-**M6 — Telegram.** Poller, inbox queue, slash commands, inline callbacks, account resolution.
-*Accept:* `/used <id>` and the inline button hit the same `lifecycle.mark_used`; double-tap is a
-no-op; a photo produces exactly one `inbox_item` and one file; poller offset survives restart; a
-Telegram outage does not crash the poller. **Accounts:** a non-allowlisted unknown user gets one
-reply and writes **zero** rows and zero files; an allowlisted unknown user gets an account created
-with their `chat_id`; `/active` from user B never shows A's coupons; a callback `use:<A's coupon id>`
-pressed by B is refused as not-found and A's coupon stays `active`; two users messaging the same
-group chat resolve to their own separate accounts.
+**M6 — deleted.** Hermes owns the Telegram channel (§8). There is nothing to build.
 
 **M7 — Skill + cron.** Write `SKILL.md` and the reference docs (including `reference/accounts.md`)
-from implemented behaviour. Wire the two cron entries with explicit working directories and
-account fan-out.
+from implemented behaviour. Wire the alerts cron entry with an explicit working directory.
 
 ---
 
@@ -840,6 +829,14 @@ account fan-out.
 
 Scheduled/automatic purge; HK public holiday calendar; OCR fallback without the agent; web UI;
 geofenced "near me" alerts; coupon sharing. Note these in `ROADMAP.md`; do not build them.
+
+Also explicitly not built, and not to be added back without a reason the sibling skills don't
+already answer:
+
+- **Any Telegram client code** — bot token, long-poll loop, inline keyboards, callback handling,
+  rate limiting (§8). Hermes owns the channel.
+- **A sent-alert ledger** (§9). If repeat messages become a nuisance, lower `alert_days_before`
+  before reaching for a table.
 
 Multi-account **is** in scope (§2.1–2.4) but is deliberately bounded. Explicitly *not* in v1, and to be
 noted in `ROADMAP.md` rather than half-built:

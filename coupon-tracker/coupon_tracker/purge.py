@@ -251,20 +251,6 @@ def doctor(scope: AccountScope) -> dict:
             }
         )
 
-    mismatched = scope.conn.execute(
-        "SELECT a.coupon_id FROM alerts_sent a JOIN coupon c ON c.id = a.coupon_id"
-        " WHERE a.account_id = ? AND c.account_id <> a.account_id",
-        (scope.account_id,),
-    ).fetchall()
-    for row in mismatched:
-        problems.append(
-            {
-                "kind": "alert_account_mismatch",
-                "coupon_id": row["coupon_id"],
-                "detail": "alerts_sent.account_id disagrees with the coupon's owner",
-            }
-        )
-
     # Purge deliberately never deletes a media row with zero references — that
     # window belongs to register_media, before its coupon row exists. So the
     # rows can accumulate, and doctor is what makes them visible.

@@ -169,22 +169,16 @@ def test_unuse_beyond_the_window_needs_force(scope, now):
     assert lifecycle.mark_unused(scope, coupon.id, much_later, force=True).new_status == "active"
 
 
-def test_extend_revives_an_expired_coupon_and_clears_alerts(scope, now):
+def test_extend_revives_an_expired_coupon(scope, now):
     coupon = add(scope, now, expires_on="2026-08-01")
     lifecycle.sweep_expiry(scope, now)
-    scope.conn.execute(
-        "INSERT INTO alerts_sent (account_id, coupon_id, alert_kind, sent_at)"
-        " VALUES (?, ?, 'pre_expiry', ?)",
-        (scope.account_id, coupon.id, clock.iso(now)),
-    )
 
     result = lifecycle.extend(scope, coupon.id, "2026-12-31", now)
 
     assert result.new_status == "active"
-    assert store.get(scope, coupon.id).expires_on == "2026-12-31"
-    assert scope.conn.execute(
-        "SELECT COUNT(*) FROM alerts_sent WHERE coupon_id = ?", (coupon.id,)
-    ).fetchone()[0] == 0
+    revived = store.get(scope, coupon.id)
+    assert revived.expires_on == "2026-12-31"
+    assert revived.expired_at is None
 
 
 def test_illegal_transition_exit_code(scope, now):

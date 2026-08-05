@@ -29,22 +29,10 @@ DEFAULTS: dict = {
     "undo_window_hours": 48,
     "alert_days_before": 1,
     "accounts": {"allowlist": []},
-    "telegram": {"bot_token": None, "poll_timeout": 30},
 }
 
 _KNOWN_KEYS = set(DEFAULTS)
-_KNOWN_TELEGRAM_KEYS = set(DEFAULTS["telegram"])
 _KNOWN_ACCOUNT_KEYS = set(DEFAULTS["accounts"])
-
-
-@dataclass(frozen=True)
-class TelegramConfig:
-    bot_token: str | None = None
-    poll_timeout: int = 30
-
-    @property
-    def enabled(self) -> bool:
-        return bool(self.bot_token)
 
 
 @dataclass(frozen=True)
@@ -70,7 +58,6 @@ class Config:
     undo_window_hours: int
     alert_days_before: int
     accounts: AccountsConfig = field(default_factory=AccountsConfig)
-    telegram: TelegramConfig = field(default_factory=TelegramConfig)
 
     def ensure_dirs(self) -> None:
         for d in (self.media_dir, self.inbox_dir, self.logs_dir, self.db_path.parent):
@@ -81,11 +68,6 @@ class Config:
 
     def account_inbox_dir(self, account_id: str) -> Path:
         return self.inbox_dir / account_id
-
-    @property
-    def offset_path(self) -> Path:
-        """Where the Telegram long-poll offset is persisted."""
-        return self.root / "telegram_offset"
 
 
 def find_config(explicit: str | os.PathLike | None = None) -> Path | None:
@@ -145,14 +127,6 @@ def _build(root: Path, source: Path | None, raw: dict) -> Config:
 
     merged = {**DEFAULTS, **{k: v for k, v in raw.items() if v is not None}}
 
-    tg_raw = raw.get("telegram") or {}
-    if not isinstance(tg_raw, dict):
-        raise ConfigError("config key `telegram` must be a mapping")
-    unknown_tg = set(tg_raw) - _KNOWN_TELEGRAM_KEYS
-    if unknown_tg:
-        raise ConfigError(f"unknown telegram config keys: {sorted(unknown_tg)}")
-    tg = {**DEFAULTS["telegram"], **tg_raw}
-
     acct_raw = raw.get("accounts") or {}
     if not isinstance(acct_raw, dict):
         raise ConfigError("config key `accounts` must be a mapping")
@@ -182,10 +156,6 @@ def _build(root: Path, source: Path | None, raw: dict) -> Config:
     except (ZoneInfoNotFoundError, ValueError) as exc:
         raise ConfigError(f"unknown timezone: {tz_name}") from exc
 
-    poll_timeout = tg.get("poll_timeout") or 30
-    if not isinstance(poll_timeout, int) or poll_timeout <= 0:
-        raise ConfigError("telegram.poll_timeout must be a positive integer")
-
     root = root.resolve()
     return Config(
         root=root,
@@ -199,10 +169,6 @@ def _build(root: Path, source: Path | None, raw: dict) -> Config:
         undo_window_hours=undo_hours,
         alert_days_before=alert_days,
         accounts=AccountsConfig(allowlist=allowlist),
-        telegram=TelegramConfig(
-            bot_token=_str_or_none(tg.get("bot_token")),
-            poll_timeout=poll_timeout,
-        ),
     )
 
 
@@ -253,7 +219,9 @@ review_threshold: 0.75
 # `couponctl unuse` without --force is refused beyond this window.
 undo_window_hours: 48
 
-# Single app-wide alert lead time, in days.
+# How many days ahead to alert. This is also the repeat-rate control: there is
+# no sent-ledger, so a coupon inside the window is reported once per daily run.
+# 1 = at most two messages, the day before and the day it expires.
 alert_days_before: 1
 
 accounts:
@@ -261,8 +229,6 @@ accounts:
   # Anyone else gets one "this bot is private" reply and is ignored.
   allowlist: []
 
-telegram:
-  # One bot serves every account. Destinations come from account.chat_id.
-  bot_token: null
-  poll_timeout: 30
+# No telegram section: Hermes owns the channel. Delivery destinations live on
+# each account (account.chat_id); this package never talks to the network.
 """

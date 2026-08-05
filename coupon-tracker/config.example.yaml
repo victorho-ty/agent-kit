@@ -1,0 +1,29 @@
+# coupon-tracker configuration.
+#
+# Copy to config.yaml (or let `couponctl init` write it) in the skill root.
+# All relative paths resolve against the directory holding this file.
+
+# Storage
+db_path: coupons.db
+media_dir: media
+inbox_dir: inbox
+logs_dir: logs
+
+# All date maths resolves in this zone. Changing it after coupons exist will
+# shift which day a coupon is considered to expire on.
+timezone: Asia/Hong_Kong
+
+# Ingest: candidates below this extraction confidence route to needs_review.
+review_threshold: 0.75
+
+# Lifecycle: `couponctl unuse` without --force is refused beyond this window.
+undo_window_hours: 48
+
+# Alerts: single app-wide lead time, in days. 1 = warn the day before.
+alert_days_before: 1
+
+telegram:
+  # Leave null to run offline; every telegram command then exits 40.
+  bot_token: null
+  chat_id: null
+  poll_timeout: 30

@@ -1,6 +1,6 @@
-# Coupon Tracker — Hermes Agent Skill + Code: Implementation Plan
+# Coupon Tracker — Hermes Agent Skill + Code
 
-You are implementing a personal coupon tracking system that runs as a Hermes Agent skill plus a
+A personal coupon tracking system that runs as a Hermes Agent skill plus a
 deterministic Python package. Build it milestone by milestone. Do not skip ahead; each milestone
 has acceptance tests that must pass before starting the next.
 

@@ -27,6 +27,16 @@ cd ~/projects/hermes/coupon-tracker
 .venv/bin/couponctl <command> [options] --json
 ```
 
+If `.venv` does not exist, create it with **Python 3.12+** — a 3.11 venv
+crashes on `python-ulid` (`from typing import override` → ImportError):
+
+```bash
+cd ~/projects/hermes/coupon-tracker
+uv run --python 3.12 couponctl <command> [options] --json
+```
+
+`uv run` builds `.venv` from `uv.lock` on first use.
+
 Always pass `--json`. Every command prints one JSON object; parse it rather than
 reading the human text. Every payload echoes the `account_id` it acted on —
 check it matches the account you intended.

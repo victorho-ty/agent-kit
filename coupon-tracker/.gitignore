@@ -7,7 +7,6 @@ coupons.db-shm
 inbox/
 media/
 logs/
-telegram_offset
 
 # Python
 .venv/

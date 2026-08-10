@@ -124,9 +124,18 @@ def _draw_pie(ax_pie, ax_labels, summary: dict) -> None:
 TABLE_CATEGORY_COLUMNS = 3
 
 
-def _wrap_header(name: str) -> str:
-    """Keep table columns narrow: 'Food & Drinks' becomes two lines."""
-    return name.replace(" & ", " &\n")
+TABLE_HEADERS = {
+    "Food & Drinks": "Food &\nDrinks",
+    "Housing & Utilities": "Housing &\nUtilities",
+    "Transportation": "Transport",
+    "Entertainment": "Entertain.",
+    categories.UNCATEGORIZED: "Uncat.",
+}
+
+
+def _table_header(name: str) -> str:
+    """Keep table columns narrow"""
+    return TABLE_HEADERS.get(name, name.replace(" & ", " &\n"))
 
 
 def _draw_top_days(ax, rows: list[dict], month: str, currency: str) -> None:
@@ -145,9 +154,9 @@ def _draw_top_days(ax, rows: list[dict], month: str, currency: str) -> None:
     ranked = sorted(present, key=lambda c: -present[c])
     shown, rest = ranked[:TABLE_CATEGORY_COLUMNS], ranked[TABLE_CATEGORY_COLUMNS:]
 
-    headers = ["Date", f"Total\n({currency})", *[_wrap_header(c) for c in shown]] + (["Other"] if rest else [])
+    headers = ["Date", f"Total\n({currency})", *[_table_header(c) for c in shown]] + (["Other"] if rest else [])
     colors = [None, None, *[_color(c) for c in shown]] + ([INK_MUTED] if rest else [])
-    step = 0.68 / (len(headers) - 1)
+    step = 0.68 / (len(headers) - 2)  # last column right-aligns on x=1.0, flush with the rule
     x_positions = [0.0] + [0.32 + step * i for i in range(len(headers) - 1)]
 
     header_y, rule_y, row_h = 0.885, 0.845, 0.135

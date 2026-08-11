@@ -1,79 +1,73 @@
-// What the radar watches, and which section of the digest each source feeds.
-// Whole-line // comments are stripped before parsing, so examples can live here.
-//
 // Every source needs a "category", and that category must be declared in the
 // "categories" list below. The order of that list is the order of sections in
 // the digest -- put what matters to you first.
 //
 // A source is not trusted until it has been checked against the live feed:
-//
 //     news-radar scan --source <name> --dry-run
 //
-// That prints what was caught without writing anything. The sources shipped
-// below were verified on 2026-08-11; replace them with your own.
 // Field reference: skills/news-radar/references/source-config.md
 {
   "timezone": "Asia/Hong_Kong",
-
   "request_delay_seconds": 2.0,
   "detail_budget": 10,
   "cluster_threshold": 0.7,
 
-// There is deliberately no scan_window and no scan_interval here. The scan
-// never messages anyone, so it has no quiet hours to keep, and the cron entry
-// is the one and only statement of how often it runs. The single cadence knob
-// that cron cannot express -- "never hit *this* source more often than every N
-// minutes" -- is min_interval_minutes, per source, below.
-
   "categories": [
     { "name": "ai",    "label": "AI" },
-    { "name": "tech",  "label": "Technology" },
-    { "name": "world", "label": "World" }
+    { "name": "equities",  "label": "Equities" },
+    { "name": "finance", "label": "Finance" },
+    { "name": "tech",  "label": "Technology" }
   ],
 
-// Dropped outright, whatever else the item says. There is no include list
-// anywhere in this skill: you already said what a source is about by giving it
-// a category, so everything it publishes is in scope.
-  "exclude": ["sponsored", "advertisement", "newsletter signup", "is sponsored by"],
+// Dropped outright, whatever else the item says.
+  "exclude": ["sponsored", "advertisement", "newsletter signup"],
 
   "sources": [
     {
-      "name": "simonwillison",
+      "name": "github-copilot",
       "category": "ai",
-      "url": "https://simonwillison.net/atom/everything/",
+      "url": "https://github.blog/changelog/label/copilot/feed/",
       "kind": "rss",
       "max_items": 30,
       "enabled": true
     },
+//    llm-news -- VERIFIED 2026-08-11, and the awkward one. Read this before
+//    changing it.
+//
+//    The page is a Next.js app that ships no news markup at all in its HTML
+//    response, so it needs "render": "browser". That costs a Chromium start
+//    per scan and forfeits conditional GET, which is why min_interval_minutes
+//    is set: there is no point paying that every hour for a page that turns
+//    over a few times a day.
+//
+//    Its items are <button> elements with NO href anywhere, so nothing here
+//    can give a per-story link -- every item is stored against the page URL
+//    and the digest will link to the section rather than the article. That is
+//    a real limitation of this source, not a misconfiguration.
+//
+//    The selector leans on Tailwind spacing classes because the page offers
+//    nothing else; #llm-news is an id and is stable, div.space-y-3 is not. If
+//    the layout is retuned this goes zero_yield, which is the designed
+//    outcome -- you will be told rather than quietly getting nothing.
+//
+//    There is deliberately no "date" field. The page prints relative times
+//    ("51m ago"), and date_text is stored verbatim and never recomputed, so an
+//    item captured at 09:00 would still claim "51m ago" in the 18:00 digest.
+//    A stale relative time is worse than no time at all. first_seen_at is on
+//    the record if you want to know when the radar saw it.
+//    The selector, if you disagree and want it anyway: "date": "span.tabular-nums"
     {
-      "name": "verge-ai",
+      "name": "llm-news",
       "category": "ai",
-      "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
-      "kind": "rss",
-      "max_items": 30,
-      "enabled": true
-    },
-    {
-      "name": "hacker-news",
-      "category": "tech",
-      "url": "https://hnrss.org/frontpage",
-      "kind": "rss",
-      "max_items": 30,
-      "enabled": true
-    },
-    {
-      "name": "ars-technica",
-      "category": "tech",
-      "url": "https://feeds.arstechnica.com/arstechnica/index",
-      "kind": "rss",
-      "max_items": 30,
-      "enabled": true
-    },
-    {
-      "name": "bbc-world",
-      "category": "world",
-      "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
-      "kind": "rss",
+      "url": "https://llm-stats.com/ai-news",
+      "kind": "html",
+      "render": "browser",
+      "list_selector": "#llm-news div.space-y-3 > div",
+      "fields": {
+        "title": "h3",
+        "summary": "p"
+      },
+      "min_interval_minutes": 180,
       "max_items": 30,
       "enabled": true
     }

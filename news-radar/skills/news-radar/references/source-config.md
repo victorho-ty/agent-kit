@@ -93,8 +93,11 @@ something to scan often.
 
 Two items become one story when either holds:
 
-1. **their canonical URLs are identical** — straight syndication, the strongest
-   signal there is;
+1. **their canonical URLs are identical *and they come from different
+   sources*** — straight syndication, the strongest signal there is. The
+   same-source case is deliberately excluded: a page that gives its items no
+   links of their own leaves every one of them holding the page's own URL, and
+   treating that as syndication collapses the whole source into one story;
 2. **their headlines overlap enough** — shared significant words over the
    *smaller* headline's word count, at or above `cluster_threshold`.
 

@@ -96,7 +96,9 @@ mean a rewording on one outlet silently suppressed the story everywhere.
 
 ## 5. Clustering
 
-Two items are one story when their canonical URLs match (syndication), or when
+Two items are one story when their canonical URLs match *and they come from
+different sources* (syndication — the same-source case means the page simply has
+no per-item links, and merging on it would collapse the source), or when
 their headlines overlap by at least `cluster_threshold`.
 
 **The overlap coefficient, not Jaccard.** Jaccard divides by the union, so it

@@ -86,7 +86,19 @@ def similarity(left: frozenset[str], right: frozenset[str]) -> float:
 
 
 def same_story(first: Item, second: Item, threshold: float) -> bool:
-    if first.url and first.url == second.url:
+    # Identical URLs mean syndication -- but only *across* sources.
+    #
+    # Within one source an identical URL means the opposite thing: the page
+    # gives its items no links of their own, so every one of them falls back to
+    # the page's own URL. llm-stats.com/ai-news is exactly that -- ten headlines
+    # in <button> elements with not one href between them -- and treating it as
+    # syndication collapsed the entire source into a single story.
+    #
+    # Two *distinct* items from one source can never legitimately share a URL
+    # anyway: item_key is sha1(source|url|title), so if the source and URL match
+    # then the titles differ, which makes them different stories. Falling
+    # through to the title comparison is always the right answer here.
+    if first.source != second.source and first.url and first.url == second.url:
         return True
     left, right = signature(first.title), signature(second.title)
     if len(left) < MIN_SIGNIFICANT_TOKENS or len(right) < MIN_SIGNIFICANT_TOKENS:

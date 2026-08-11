@@ -17,9 +17,10 @@ from news_radar.models import Item
 THRESHOLD = DEFAULT_CLUSTER_THRESHOLD
 
 
-def item(id: int, title: str, url: str, domain: str | None = None) -> Item:
+def item(id: int, title: str, url: str, domain: str | None = None,
+         source: str | None = None) -> Item:
     return Item(
-        id=id, source=f"s{id}", item_key=f"k{id}", url=url, title=title,
+        id=id, source=source or f"s{id}", item_key=f"k{id}", url=url, title=title,
         summary=None, detail_text=None, date_text=None,
         source_domain=domain or f"outlet{id}.example.com",
         first_seen_at="2026-08-11T14:00:00+08:00", digested_at=None, run_id=1,
@@ -44,11 +45,11 @@ def test_rewordings_of_one_story_merge(left, right):
     assert stories[0].items[0].id == 1        # oldest wins: it supplies title and link
 
 
-def test_identical_urls_merge_whatever_the_titles_say():
-    """Straight syndication. The URL is the strongest signal there is."""
+def test_identical_urls_merge_across_sources():
+    """Straight syndication. Across outlets, the URL is the strongest signal."""
     stories = cluster.cluster([
-        item(1, "Rates held", "https://wire.example/story/1"),
-        item(2, "Completely different words here", "https://wire.example/story/1"),
+        item(1, "Rates held", "https://wire.example/story/1", source="alpha"),
+        item(2, "Completely different words here", "https://wire.example/story/1", source="beta"),
     ], THRESHOLD)
     assert len(stories) == 1
 
@@ -66,6 +67,23 @@ def test_different_stories_stay_apart(left, right):
     stories = cluster.cluster(
         [item(1, left, "https://a.example/1"), item(2, right, "https://b.example/2")], THRESHOLD)
     assert len(stories) == 2
+
+
+def test_a_source_with_no_per_item_links_does_not_collapse():
+    """Regression, found while configuring llm-stats.com/ai-news.
+
+    That page renders its headlines in <button> elements with no href anywhere,
+    so every item falls back to the page's own URL. Treating identical URLs as
+    syndication regardless of source turned ten distinct stories into one, and
+    the source would have gone almost silent without ever failing.
+    """
+    page = "https://llm-stats.com/ai-news"
+    stories = cluster.cluster([
+        item(1, "Nvidia releases Nemotron 3.5 Lightning, an open MoE model", page, source="llm-news"),
+        item(2, "Spotify plans to roll out AI Persona labeling in September", page, source="llm-news"),
+        item(3, "Apple's iOS 27 beta contains references to unreleased devices", page, source="llm-news"),
+    ], THRESHOLD)
+    assert len(stories) == 3
 
 
 def test_a_shared_product_family_is_not_a_shared_story():

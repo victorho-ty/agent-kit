@@ -1,0 +1,48 @@
+[project]
+name = "news-radar"
+version = "0.1.0"
+description = "Watches configured news sources and digests what is new, by category, for a Hermes Agent skill"
+requires-python = ">=3.12"
+
+# Three runtime dependencies, each earning its place:
+#
+# * `beautifulsoup4` gives real CSS selectors (via the soupsieve it bundles) over
+#   a parser that tolerates the broken markup these sites actually ship. Most
+#   sources here are feeds and need no selectors at all, but the ones that have
+#   no feed need selectors that behave the way the person copying them out of
+#   devtools expects.
+# * `playwright` is only reached for sources marked "render": "browser", and is
+#   imported lazily, so a feed-only scan, --dry-run and the whole test suite
+#   never need Chromium.
+# * `tzdata` is data, not code: zoneinfo prefers the operating system's copy and
+#   only falls back to this one, which is what makes Asia/Hong_Kong resolve on
+#   Windows and in minimal containers.
+#
+# RSS and Atom are parsed with the standard library's xml.etree -- a feed reader
+# would be a fourth dependency for about twenty lines of work.
+dependencies = [
+    "beautifulsoup4>=4.12",
+    "playwright>=1.58.0",
+    "tzdata>=2024.1",
+]
+
+[project.scripts]
+news-radar = "news_radar.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["news_radar", "news_radar.config"]
+
+[tool.setuptools.package-data]
+"news_radar.config" = ["sources.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]

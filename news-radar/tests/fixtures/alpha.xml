@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+An outlet in the "ai" category.
+
+Load-bearing for the tests:
+  * item 1 is the same story as beta.xml item 1, reworded  -> must cluster
+  * item 2 carries a double-escaped entity (&amp;#8217;)     -> must decode
+  * item 3 is sponsored                                      -> must be excluded
+  * HTML inside <description>                                -> must become text
+-->
+<rss version="2.0">
+  <channel>
+    <title>Alpha Wire</title>
+    <link>https://alpha.example.com/</link>
+    <item>
+      <title>OpenAI releases GPT-X</title>
+      <link>https://alpha.example.com/2026/08/openai-releases-gpt-x</link>
+      <description>&lt;p&gt;The model is &lt;strong&gt;available today&lt;/strong&gt;.&lt;/p&gt;</description>
+      <pubDate>Mon, 11 Aug 2026 09:00:00 +0800</pubDate>
+    </item>
+    <item>
+      <title>Mark Zuckerberg&amp;#8217;s big bet on AI</title>
+      <link>https://alpha.example.com/2026/08/zuckerberg-bet</link>
+      <description>A long read.</description>
+      <pubDate>Mon, 11 Aug 2026 08:30:00 +0800</pubDate>
+    </item>
+    <item>
+      <title>The future of storage, sponsored by BigCorp</title>
+      <link>https://alpha.example.com/2026/08/sponsored-storage</link>
+      <description>This post is sponsored by BigCorp.</description>
+      <pubDate>Mon, 11 Aug 2026 08:00:00 +0800</pubDate>
+    </item>
+  </channel>
+</rss>

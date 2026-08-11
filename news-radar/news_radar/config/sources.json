@@ -1,0 +1,112 @@
+// What the radar watches, and which section of the digest each source feeds.
+// Whole-line // comments are stripped before parsing, so examples can live here.
+//
+// Every source needs a "category", and that category must be declared in the
+// "categories" list below. The order of that list is the order of sections in
+// the digest -- put what matters to you first.
+//
+// A source is not trusted until it has been checked against the live feed:
+//
+//     news-radar scan --source <name> --dry-run
+//
+// That prints what was caught without writing anything. The sources shipped
+// below were verified on 2026-08-11; replace them with your own.
+// Field reference: skills/news-radar/references/source-config.md
+{
+  "timezone": "Asia/Hong_Kong",
+
+  "request_delay_seconds": 2.0,
+  "detail_budget": 10,
+  "cluster_threshold": 0.7,
+
+// There is deliberately no scan_window and no scan_interval here. The scan
+// never messages anyone, so it has no quiet hours to keep, and the cron entry
+// is the one and only statement of how often it runs. The single cadence knob
+// that cron cannot express -- "never hit *this* source more often than every N
+// minutes" -- is min_interval_minutes, per source, below.
+
+  "categories": [
+    { "name": "ai",    "label": "AI" },
+    { "name": "tech",  "label": "Technology" },
+    { "name": "world", "label": "World" }
+  ],
+
+// Dropped outright, whatever else the item says. There is no include list
+// anywhere in this skill: you already said what a source is about by giving it
+// a category, so everything it publishes is in scope.
+  "exclude": ["sponsored", "advertisement", "newsletter signup", "is sponsored by"],
+
+  "sources": [
+    {
+      "name": "simonwillison",
+      "category": "ai",
+      "url": "https://simonwillison.net/atom/everything/",
+      "kind": "rss",
+      "max_items": 30,
+      "enabled": true
+    },
+    {
+      "name": "verge-ai",
+      "category": "ai",
+      "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+      "kind": "rss",
+      "max_items": 30,
+      "enabled": true
+    },
+    {
+      "name": "hacker-news",
+      "category": "tech",
+      "url": "https://hnrss.org/frontpage",
+      "kind": "rss",
+      "max_items": 30,
+      "enabled": true
+    },
+    {
+      "name": "ars-technica",
+      "category": "tech",
+      "url": "https://feeds.arstechnica.com/arstechnica/index",
+      "kind": "rss",
+      "max_items": 30,
+      "enabled": true
+    },
+    {
+      "name": "bbc-world",
+      "category": "world",
+      "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+      "kind": "rss",
+      "max_items": 30,
+      "enabled": true
+    }
+
+//    A source that should not be hit as often as the rest. min_interval_minutes
+//    is a floor, not a schedule: the hourly cron still runs, and this source is
+//    reported as "throttled" and skipped until its floor has passed. Use it for
+//    slow personal blogs and for anything with "render": "browser".
+//    {
+//      "name": "slow-blog",
+//      "category": "ai",
+//      "url": "https://example.dev/feed",
+//      "kind": "rss",
+//      "min_interval_minutes": 360,
+//      "enabled": false
+//    },
+//    An outlet with no feed. Selectors are a last resort -- they break on a
+//    redesign, which a feed cannot. Verify with --dry-run before enabling.
+//    {
+//      "name": "example-outlet",
+//      "category": "world",
+//      "url": "https://news.example.com/latest",
+//      "kind": "html",
+//      "render": "static",
+//      "list_selector": "article.story",
+//      "fields": {
+//        "title": "h2 a",
+//        "link": "h2 a@href",
+//        "summary": "p.standfirst",
+//        "date": "time"
+//      },
+//      "max_items": 25,
+//      "enabled": false
+//    }
+  ]
+}

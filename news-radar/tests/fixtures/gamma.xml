@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+An outlet in the "world" category, used to prove that sections are kept apart
+and that clustering does not reach across them.
+
+Item 1 is deliberately the same story as alpha/beta item 1. Because this source
+sits in a different category, it must appear in BOTH sections rather than being
+merged into one and losing a section.
+-->
+<rss version="2.0">
+  <channel>
+    <title>Gamma Times</title>
+    <link>https://gamma.example.net/</link>
+    <item>
+      <title>OpenAI releases GPT-X</title>
+      <link>https://gamma.example.net/world/openai-gpt-x</link>
+      <description>Regulators took note.</description>
+      <pubDate>Mon, 11 Aug 2026 09:30:00 +0800</pubDate>
+    </item>
+    <item>
+      <title>Storm warning issued for the eastern seaboard</title>
+      <link>https://gamma.example.net/world/storm-warning</link>
+      <description>Landfall expected Thursday.</description>
+      <pubDate>Mon, 11 Aug 2026 06:00:00 +0800</pubDate>
+    </item>
+  </channel>
+</rss>

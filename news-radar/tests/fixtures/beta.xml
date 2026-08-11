@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+A second outlet, also in the "ai" category.
+
+Load-bearing:
+  * item 1 is alpha's item 1 reworded -> clusters on title overlap alone,
+    which is the case exact matching would miss
+  * item 2 shares the word "OpenAI" with it but is a different story
+    -> must NOT cluster, or the digest starts inventing connections
+-->
+<rss version="2.0">
+  <channel>
+    <title>Beta Daily</title>
+    <link>https://beta.example.org/</link>
+    <item>
+      <title>OpenAI Releases GPT-X, Its Biggest Model Yet</title>
+      <link>https://beta.example.org/tech/openai-gpt-x-launch</link>
+      <description>Rivals responded within hours.</description>
+      <pubDate>Mon, 11 Aug 2026 09:20:00 +0800</pubDate>
+    </item>
+    <item>
+      <title>OpenAI hires a new chief financial officer</title>
+      <link>https://beta.example.org/business/openai-cfo</link>
+      <description>An unrelated appointment.</description>
+      <pubDate>Mon, 11 Aug 2026 07:00:00 +0800</pubDate>
+    </item>
+  </channel>
+</rss>

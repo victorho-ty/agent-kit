@@ -31,31 +31,6 @@
       "max_items": 30,
       "enabled": true
     },
-//    llm-news -- VERIFIED 2026-08-11, and the awkward one. Read this before
-//    changing it.
-//
-//    The page is a Next.js app that ships no news markup at all in its HTML
-//    response, so it needs "render": "browser". That costs a Chromium start
-//    per scan and forfeits conditional GET, which is why min_interval_minutes
-//    is set: there is no point paying that every hour for a page that turns
-//    over a few times a day.
-//
-//    Its items are <button> elements with NO href anywhere, so nothing here
-//    can give a per-story link -- every item is stored against the page URL
-//    and the digest will link to the section rather than the article. That is
-//    a real limitation of this source, not a misconfiguration.
-//
-//    The selector leans on Tailwind spacing classes because the page offers
-//    nothing else; #llm-news is an id and is stable, div.space-y-3 is not. If
-//    the layout is retuned this goes zero_yield, which is the designed
-//    outcome -- you will be told rather than quietly getting nothing.
-//
-//    There is deliberately no "date" field. The page prints relative times
-//    ("51m ago"), and date_text is stored verbatim and never recomputed, so an
-//    item captured at 09:00 would still claim "51m ago" in the 18:00 digest.
-//    A stale relative time is worse than no time at all. first_seen_at is on
-//    the record if you want to know when the radar saw it.
-//    The selector, if you disagree and want it anyway: "date": "span.tabular-nums"
     {
       "name": "llm-news",
       "category": "ai",
@@ -68,6 +43,14 @@
         "summary": "p"
       },
       "min_interval_minutes": 180,
+      "max_items": 30,
+      "enabled": true
+    },
+    {
+      "name": "cnbc-finance",
+      "category": "finance",
+      "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",
+      "kind": "rss",
       "max_items": 30,
       "enabled": true
     }

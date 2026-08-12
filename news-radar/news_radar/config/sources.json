@@ -1,0 +1,89 @@
+// Every source needs a "category", and that category must be declared in the
+// "categories" list below. The order of that list is the order of sections in
+// the digest -- put what matters to you first.
+//
+// A source is not trusted until it has been checked against the live feed:
+//     news-radar scan --source <name> --dry-run
+//
+// Field reference: skills/news-radar/references/source-config.md
+{
+  "timezone": "Asia/Hong_Kong",
+  "request_delay_seconds": 2.0,
+  "detail_budget": 10,
+  "cluster_threshold": 0.7,
+
+  "categories": [
+    { "name": "ai",    "label": "AI" },
+    { "name": "equities",  "label": "Equities" },
+    { "name": "finance", "label": "Finance" },
+    { "name": "tech",  "label": "Technology" }
+  ],
+
+// Dropped outright, whatever else the item says.
+  "exclude": ["sponsored", "advertisement", "newsletter signup"],
+
+  "sources": [
+    {
+      "name": "github-copilot",
+      "category": "ai",
+      "url": "https://github.blog/changelog/label/copilot/feed/",
+      "kind": "rss",
+      "max_items": 30,
+      "enabled": true
+    },
+    {
+      "name": "llm-news",
+      "category": "ai",
+      "url": "https://llm-stats.com/ai-news",
+      "kind": "html",
+      "render": "browser",
+      "list_selector": "#llm-news div.space-y-3 > div",
+      "fields": {
+        "title": "h3",
+        "summary": "p"
+      },
+      "min_interval_minutes": 180,
+      "max_items": 30,
+      "enabled": true
+    },
+    {
+      "name": "cnbc-finance",
+      "category": "finance",
+      "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",
+      "kind": "rss",
+      "max_items": 30,
+      "enabled": true
+    }
+
+//    A source that should not be hit as often as the rest. min_interval_minutes
+//    is a floor, not a schedule: the hourly cron still runs, and this source is
+//    reported as "throttled" and skipped until its floor has passed. Use it for
+//    slow personal blogs and for anything with "render": "browser".
+//    {
+//      "name": "slow-blog",
+//      "category": "ai",
+//      "url": "https://example.dev/feed",
+//      "kind": "rss",
+//      "min_interval_minutes": 360,
+//      "enabled": false
+//    },
+//    An outlet with no feed. Selectors are a last resort -- they break on a
+//    redesign, which a feed cannot. Verify with --dry-run before enabling.
+//    {
+//      "name": "example-outlet",
+//      "category": "world",
+//      "url": "https://news.example.com/latest",
+//      "kind": "html",
+//      "render": "static",
+//      "list_selector": "article.story",
+//      "fields": {
+//        "title": "h2 a",
+//        "link": "h2 a@href",
+//        "summary": "p.standfirst",
+//        "date": "time"
+//      },
+//      "max_items": 25,
+//      "enabled": false
+//    }
+  ]
+}

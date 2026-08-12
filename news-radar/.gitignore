@@ -1,0 +1,10 @@
+# Runtime state. The database lives outside the bundle by default
+# (~/.local/share/hermes-news-radar), but an operator who points
+# NEWS_RADAR_DB at the bundle root should not commit it either.
+*.db
+*.db-journal
+*.db-wal
+
+.venv/
+*.egg-info/
+__pycache__/

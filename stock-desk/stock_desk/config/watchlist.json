@@ -1,0 +1,58 @@
+{
+  "timezone": "Asia/Hong_Kong",
+  "report": {
+    "frequency": "daily",
+    "minutes_before_open": 30,
+    "cluster_threshold": 0.6,
+    "news_lookback_days": 3,
+    "event_horizon_days": 10,
+    "max_stories": 12
+  },
+  "defaults": {
+    "analysis_types": ["technical", "competitor"],
+    "technical_horizon_days": 30,
+    "min_avg_dollar_volume": 5000000
+  },
+  "tickers": [
+    {
+      "ticker": "SPCX",
+      "company_name": "Space X",
+      "enabled": true,
+      "analysis_types": ["technical", "competitor"],
+      "technical_horizon_days": 30,
+      "competitors": ["RKLB"],
+      "sector_keywords": ["Rockets", "Aerospace Manufacturing", "AI Compute"],
+      "notes": ""
+    },
+    {
+      "ticker": "MSFT",
+      "company_name": "Microsoft Corporation",
+      "enabled": true,
+      "analysis_types": ["technical", "competitor"],
+      "technical_horizon_days": 30,
+      "competitors": ["GOOG"],
+      "sector_keywords": ["AI Software", "Hyperscalar"],
+      "notes": ""
+    },
+    {
+      "ticker": "CBRS",
+      "company_name": "Cerabras Systems",
+      "enabled": true,
+      "analysis_types": ["technical", "competitor"],
+      "technical_horizon_days": 30,
+      "competitors": ["NVIDIA", "AMD"],
+      "sector_keywords": ["Inference chip", "AI infrastructure", "GPU alternatives"],
+      "notes": ""
+    },
+    {
+      "ticker": "NVDA",
+      "company_name": "NVIDIA Corporation",
+      "enabled": true,
+      "analysis_types": ["technical", "competitor"],
+      "technical_horizon_days": 30,
+      "competitors": ["CBRS", "AMD"],
+      "sector_keywords": ["AI infrastructure", "GPU", "AI chip"],
+      "notes": ""
+    }
+  ]
+}

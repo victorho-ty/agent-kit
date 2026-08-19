@@ -21,7 +21,7 @@
       "analysis_types": ["technical", "competitor"],
       "technical_horizon_days": 30,
       "competitors": ["RKLB"],
-      "sector_keywords": ["Rockets", "Aerospace Manufacturing", "AI Compute"],
+      "sector_keywords": ["Aerospace Manufacturing", "AI Compute"],
       "notes": ""
     },
     {
@@ -36,7 +36,7 @@
     },
     {
       "ticker": "CBRS",
-      "company_name": "Cerabras Systems",
+      "company_name": "Cerebras Systems",
       "enabled": true,
       "analysis_types": ["technical", "competitor"],
       "technical_horizon_days": 30,
@@ -52,6 +52,26 @@
       "technical_horizon_days": 30,
       "competitors": ["CBRS", "AMD"],
       "sector_keywords": ["AI infrastructure", "GPU", "AI chip"],
+      "notes": ""
+    },
+    {
+      "ticker": "QBTS",
+      "company_name": "D-Wave Quantum Inc",
+      "enabled": true,
+      "analysis_types": ["technical", "competitor"],
+      "technical_horizon_days": 30,
+      "competitors": ["RGTI"],
+      "sector_keywords": ["Quantum computing"],
+      "notes": ""
+    },
+    {
+      "ticker": "RGTI",
+      "company_name": "Rigetti Computing Inc",
+      "enabled": true,
+      "analysis_types": ["technical", "competitor"],
+      "technical_horizon_days": 30,
+      "competitors": ["QBTS"],
+      "sector_keywords": ["Quantum computing", "Superconducting quantum"],
       "notes": ""
     }
   ]

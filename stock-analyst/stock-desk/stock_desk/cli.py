@@ -21,11 +21,10 @@ import argparse
 import json
 import sys
 from datetime import date, datetime
-from pathlib import Path
 
 from . import bars as bars_module
 from . import brief as brief_module
-from . import charts, clock, db, events, markets, news, portfolio, report, settings
+from . import charts, clock, db, events, markets, news, portfolio, report
 from .config import watchlist as watchlist_config
 from .errors import ConfigError, DeskError, ExitCode, NotFoundError
 from .models import TickerConfig, Trade

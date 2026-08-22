@@ -54,11 +54,21 @@ This is the thing to understand before anything else.
 detection is polled and reporting is driven by the ledger, coupled through a file
 rather than through timing:
 
-```bash
-cd ~/projects/hermes/profile-estates-analyst/hk-estates-supply && \
-  .venv/bin/hk-supply check >/dev/null && \
-  [ "$(.venv/bin/hk-supply pending --count)" -gt 0 ] && hermes-run hk-estates-supply-report
-```
+Registered as two cron jobs in the estates-analyst profile:
+
+- `hk-estates-supply-daily-check` (job `yyyy`) — `no_agent`, schedule
+  `15 0 * * *`, runs `hk-supply-daily-gate.sh`.
+  The gate runs `hk-supply check`, swallows `ERR_FETCH` (20) silently, prints
+  and exits non-zero on `ERR_HISTORY` (11) / `ERR_PARSE` (21) so the cron
+  system raises an error alert, and when `hk-supply pending --count` is above
+  zero fires `hermes cron run xxxx` to trigger the report.
+- `hk-estates-supply-report` (job `xxxx`) — agent job with skills
+  `[hk-estates-supply]`, schedule `59 23 29 2 *` (Feb 29 only: recurring so a
+  `hermes cron run` never consumes it, yet it never self-fires), deliver to Telegram.
+
+Pitfall: a **one-shot** cron job is consumed and removed by `hermes cron run`
+after a single fire, so a "trigger on demand" job must be recurring with a
+never-firing schedule like `59 23 29 2 *`.
 
 Register the check as a **plain command, not a prompt**. It is fully
 deterministic, and putting a model in that loop burns tokens on 361 days when the

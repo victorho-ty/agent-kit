@@ -1,0 +1,80 @@
+{
+  "timezone": "Asia/Hong_Kong",
+  "report": {
+    "minutes_before_open": 30,
+    "cluster_threshold": 0.6,
+    "event_horizon_days": 10,
+    "max_stories": 12
+  },
+  "defaults": {
+    "analysis_types": ["technical", "competitor"],
+    "technical_horizon_days": 30,
+    "min_avg_dollar_volume": 5000000.0
+  },
+  "tickers": [
+    {
+      "ticker": "SPCX",
+      "company_name": "SpaceX",
+      "competitors": ["RKLB"]
+    },
+    {
+      "ticker": "MSFT",
+      "company_name": "Microsoft Corporation",
+      "competitors": ["GOOG"]
+    },
+    {
+      "ticker": "CBRS",
+      "company_name": "Cerebras Systems",
+      "competitors": ["NVDA","AMD"]
+    },
+    {
+      "ticker": "NVDA",
+      "company_name": "NVIDIA Corporation",
+      "competitors": ["CBRS","AMD"]
+    },
+    {
+      "ticker": "QBTS",
+      "company_name": "D-Wave Quantum",
+      "competitors": ["RGTI"]
+    },
+    {
+      "ticker": "RGTI",
+      "company_name": "Rigetti Computing",
+      "competitors": ["QBTS"]
+    }
+  ],
+  "sectors": [
+    {
+      "name": "AI infrastructure",
+      "members": [
+        "NVDA",
+        "CBRS",
+        "AMD"
+      ]
+    },
+    {
+      "name": "Quantum computing",
+      "members": [
+        "QBTS",
+        "RGTI"
+      ]
+    },
+    {
+      "name": "Space and launch",
+      "members": [
+        "SPCX",
+        "RKLB"
+      ]
+    },
+    {
+      "name": "Hyperscaler and AI software",
+      "members": [
+        "MSFT",
+        "GOOG"
+      ]
+    }
+  ],
+  "macro": {
+    "enabled": true
+  }
+}

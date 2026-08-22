@@ -51,6 +51,11 @@ INK = "#1a1a1a"
 # history is forty quarters; every one labelled is a solid grey band.
 MAX_X_TICKS = 14
 
+# Breathing room above and below a chart's series, as a fraction of its range --
+# and, for a series that never moves, of its value.
+Y_PAD_FRACTION = 0.10
+Y_FLAT_PAD_FRACTION = 0.05
+
 # In preference order. The first three ship with Ubuntu's
 # fonts-noto-cjk package; the rest cover macOS and Windows.
 CJK_CANDIDATES = (
@@ -151,16 +156,28 @@ def format_pct(entry: dict) -> str:
 
 
 def y_limits(values: list[int]) -> tuple[float, float]:
-    """``(0, max * 1.12)``. The zero is the point, and it is not negotiable.
+    """The data's own range plus a buffer at each end.
 
-    These are counts of flats, not an index. Matplotlib's default window crops to
-    the data, which renders 61,000-77,000 edge to edge and turns a 20% band into
-    a picture of something doubling and halving. A desk whose whole discipline is
-    not overstating a movement cannot ship an axis that overstates every movement
-    by construction. The headroom above the maximum is for the end label.
+    Cropped to the series rather than anchored at zero: these are slow-moving
+    stock figures in the tens of thousands, and a zero-based axis pushes the
+    whole line into a flat band in the top fifth of the frame, which is unreadable
+    on a phone. The operator asked for the window that shows the movement.
+
+    The trade-off is real and is handled elsewhere rather than by the axis: a
+    cropped window makes a small percentage move look large, so the exact size of
+    every move is in the table beside the chart, to two decimal places and with
+    its direction coloured. Never read magnitude off the height of this line.
+
+    The floor is clamped at zero because a count of flats cannot be negative.
     """
-    top = max(values) if values else 1
-    return 0.0, top * 1.12
+    if not values:
+        return 0.0, 1.0
+
+    low, high = min(values), max(values)
+    span = high - low
+    # A series that never moves would otherwise collapse onto a single line.
+    pad = span * Y_PAD_FRACTION if span else max(1.0, abs(high) * Y_FLAT_PAD_FRACTION)
+    return max(0.0, low - pad), high + pad
 
 
 def tick_positions(count: int, maximum: int = MAX_X_TICKS) -> list[int]:
@@ -362,7 +379,12 @@ def render_chart(rows, field: str, chinese: str, english: str, quarter: str,
         axes.plot(positions, values, marker="o", markersize=4.5, linewidth=2.0,
                   color="#1a73e8")
         axes.set_ylabel("Units", fontfamily=_families(None))
-        axes.grid(True, alpha=0.3, color=GRID)
+        # Dotted, on both axes: on a phone this is read at a third of its drawn
+        # size, and a dotted rule stays a guide rather than competing with the
+        # series for attention the way a solid one does.
+        axes.grid(True, which="major", linestyle=":", linewidth=0.9,
+                  color=GRID, alpha=0.9)
+        axes.set_axisbelow(True)
         axes.tick_params(axis="y", labelsize=9)
         axes.yaxis.set_major_formatter(lambda value, _pos: f"{value:,.0f}")
 

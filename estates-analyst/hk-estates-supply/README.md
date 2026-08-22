@@ -115,9 +115,6 @@ Three images, sent in this order, sized for a phone:
 2. **現樓貨尾** — completed but unsold, over the whole history;
 3. **建築中未售** — under construction and unsold, over the whole history.
 
-Both charts are zero-based: these are counts of flats, and an axis cropped to the
-data turns a 20% band into a picture of something doubling and halving.
-
 Telegram renders no HTML, which is why the table that used to be an HTML e-mail
 body is a PNG like the charts are. The message body comes from `summary_lines`,
 already formatted, and the agent relays those strings rather than restating the
@@ -179,7 +176,7 @@ Hermes owns the channel; these tools only ever hand back JSON and file paths.
 uv run pytest -q
 ```
 
-86 tests, no network, no wall clock, and no PDF binaries — the extractor is
+89 tests, no network, no wall clock, and no PDF binaries — the extractor is
 exercised through word boxes, so the trap it exists to avoid is visible in the
 test rather than hidden in a 500KB file nobody can diff.
 
@@ -204,5 +201,6 @@ The ones that matter most:
    that went up.
 8. **a report about an older quarter shows that quarter** — the table window and
    both charts end at the subject, not at today;
-9. **the y-axis starts at zero and the x labels thin out** — the two ways a
-   correct series can still be drawn misleadingly.
+9. **the y-axis frames the data and the x labels thin out** — the axis is
+   cropped to the series so the shape is readable on a phone, which is why the
+   exact size of every move lives in the table and never in the line.

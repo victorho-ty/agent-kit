@@ -123,14 +123,19 @@ pipeline, and this bundle takes no view on either.
 
 ## The charts
 
-**Both trend charts start their y axis at zero.** These are counts of flats, not
-an index, so the default window — cropped to the data — would draw
-61,000 to 77,000 edge to edge and turn a 20% band into a picture of something
-doubling and halving. A desk whose discipline is not overstating a movement
-cannot ship an axis that overstates every movement by construction.
+**Both trend charts window on the data, not on zero** — `min` less a tenth of the
+span to `max` plus a tenth, floored at zero. These figures sit in the tens of
+thousands and move a thousand at a time, so a zero-based axis puts the whole line
+in a flat band at the top of the frame, unreadable on a phone.
 
-The consequence is that a flat series looks flat and sits in a band near the top
-of the frame. That is correct, and the exact moves are in the table beside it.
+The cost of a cropped axis is that a small percentage move looks large. **That is
+why the height of the line is never the source of anything you say.** The exact
+size of every move is in the table, to two decimal places, with its direction
+coloured; the chart is there for shape and for where the level sits in its own
+recent range.
+
+Grid lines are dotted so they stay a guide rather than competing with the series
+at phone size.
 
 X labels are thinned to at most fourteen, counting back from the newest quarter
 so the one the report is about always keeps its label. Four quarters a year means

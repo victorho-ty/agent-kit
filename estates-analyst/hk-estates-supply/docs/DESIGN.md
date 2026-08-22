@@ -63,19 +63,27 @@ four-quarter table and a twelve-quarter table have identical row heights and typ
 sizes. A report that looks different every quarter is one people stop reading
 carefully.
 
-### The chart y-axis starts at zero
+### The chart y-axis frames the data, with a buffer
 
-The original script let matplotlib autoscale, which crops the window to the data.
-For 建築中未售 that means 61,000-77,000 drawn edge to edge: a 20% band rendered as
-a chart that appears to double and halve. Every quarter's ordinary drift looked
-like an event.
+Both charts window on the series' own range — `min - 10%` of the span to
+`max + 10%`, floored at zero — rather than anchoring at the origin.
 
-A desk whose entire discipline is not overstating a movement cannot ship an axis
-that overstates every movement by construction, so both charts are zero-based
-with headroom for the end label. The cost is real and accepted: a series with a
-narrow range now sits in a narrow band near the top of the frame. That is what a
-series with a narrow range should look like, and the exact moves — to two decimal
-places, with their direction coloured — are in the table beside it.
+This was tried the other way first. A zero-based axis cannot overstate a
+movement, which is the property a research desk would like to have; but for
+figures that sit in the tens of thousands and move by a thousand at a time, it
+pushes the whole line into a flat band in the top fifth of the frame. On the
+phone these are read on, that is a chart nobody can read, and an unreadable chart
+is worse than an honest-but-flattering one because it conveys nothing at all.
+
+So the axis shows the shape, and the overstatement is answered where it can be
+answered exactly: **the table beside the chart carries every move as a
+percentage, to two decimal places, with its direction coloured.** The skill's
+standing rule that the agent never describes a chart — it has a file path, not a
+picture — is what keeps the cropped axis from turning into a claim. Magnitude is
+never read off the line.
+
+Grid lines are dotted for the same reason the axis is cropped: on a phone a solid
+rule competes with the series, and a dotted one stays a guide.
 
 ### Colour is decided by `direction`, never by `pct`
 

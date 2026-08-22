@@ -8,6 +8,8 @@ that went up.
 
 from __future__ import annotations
 
+import pytest
+
 from hk_estates_supply import history, render
 
 
@@ -42,16 +44,34 @@ def test_the_sign_is_always_printed():
     assert render.format_pct({"pct": 5.2632, "direction": "up"}).startswith("+")
 
 
-def test_the_y_axis_starts_at_zero():
-    """61,000-77,000 cropped edge to edge looks like something doubling and halving."""
+def test_the_y_axis_frames_the_data_not_the_origin():
+    """A zero-based axis pushes a 61,000-77,000 series into a flat band at the top."""
     bottom, top = render.y_limits([61000, 70000, 77000])
-    assert bottom == 0
-    assert top > 77000          # headroom for the end label
-    assert top < 77000 * 1.5    # but not so much that the series is a flat line
+    assert bottom < 61000       # the whole series is inside the frame
+    assert top > 77000
+    assert bottom > 50000       # but the window is the data's, not the origin's
+
+
+def test_both_ends_get_the_same_buffer():
+    bottom, top = render.y_limits([14000, 28000])
+    assert 14000 - bottom == pytest.approx(top - 28000)
+    assert 14000 - bottom == pytest.approx(14000 * render.Y_PAD_FRACTION)
+
+
+def test_a_series_that_never_moves_does_not_collapse():
+    """Equal min and max would otherwise give a zero-height axis."""
+    bottom, top = render.y_limits([61000, 61000, 61000])
+    assert bottom < 61000 < top
+
+
+def test_the_axis_never_goes_below_zero():
+    """A count of flats has no negative half, however wide the buffer."""
+    assert render.y_limits([500, 40000])[0] >= 0
 
 
 def test_the_y_axis_survives_a_single_point():
-    assert render.y_limits([19000]) == (0, 19000 * 1.12)
+    bottom, top = render.y_limits([19000])
+    assert bottom < 19000 < top
 
 
 def test_x_labels_are_thinned_before_they_can_collide():

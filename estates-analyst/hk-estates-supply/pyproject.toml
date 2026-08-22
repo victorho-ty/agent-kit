@@ -1,0 +1,54 @@
+[project]
+name = "hk-estates-supply"
+version = "0.1.0"
+description = "Hong Kong private residential primary-market supply monitor for the Hermes estates-analyst profile"
+requires-python = ">=3.12"
+
+# Three runtime dependencies, each earning its place:
+#
+# * `pdfplumber` is the only thing here that could not be hand-rolled. The three
+#   headline figures live on page 2 of a PDF as words with coordinates, and a
+#   figure sits on the same *visual* row as its label but with a different
+#   baseline -- so reading-order text extraction puts the number before the
+#   label on some rows and after it on others. Grouping words by vertical centre
+#   needs per-word bounding boxes, which is exactly what pdfplumber exposes.
+# * `matplotlib` draws the two trend charts and the coloured quarter table.
+#   Telegram renders no HTML, so the table that used to be an HTML e-mail body
+#   is now a PNG like the charts are.
+# * `tzdata` is data, not code: zoneinfo prefers the operating system's copy and
+#   only falls back to this one, which is what makes Asia/Hong_Kong resolve on
+#   Windows and in minimal containers.
+#
+# Deliberately *not* dependencies:
+#
+# * `requests` / `beautifulsoup4` -- the index page is 3KB of static markup with
+#   a single PDF link on it. `urllib` plus a regex is fewer moving parts than an
+#   HTTP stack and an HTML parser, and it keeps the fetch layer testable without
+#   a network stub library.
+# * `pandas` -- the history is a five-column CSV that has never exceeded a few
+#   dozen rows. `csv` and a dataclass read it, and quarter arithmetic and QoQ
+#   stay pure stdlib, so the whole test suite runs without pandas and without a
+#   network.
+dependencies = [
+    "pdfplumber>=0.11",
+    "matplotlib>=3.8",
+    "tzdata>=2024.1",
+]
+
+[project.scripts]
+hk-supply = "hk_estates_supply.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["hk_estates_supply"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]

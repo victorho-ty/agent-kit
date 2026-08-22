@@ -1,0 +1,5 @@
+# The history CSV is the durable record and is written with LF by the tools.
+# Without this, git's autocrlf turns it into CRLF on a Windows checkout and the
+# next append rewrites all eighteen rows, which buries a one-line change in a
+# whole-file diff.
+data/*.csv text eol=lf

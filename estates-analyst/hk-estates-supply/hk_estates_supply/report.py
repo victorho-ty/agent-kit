@@ -175,10 +175,6 @@ def summary_lines(quarter: str, row, qoq: dict, prior: str | None) -> list[str]:
         )
     if prior:
         lines.append(f"QoQ is against {prior}.")
-    lines.append(
-        "Figures are rounded to the nearest thousand at source, so the smallest "
-        "representable move is already several percent."
-    )
     return lines
 
 

@@ -107,8 +107,7 @@ the quarter before it.
     "Land ready (可隨時動工): 16,000 units, -15.79% QoQ",
     "Being built (建築中未售): 61,000 units, -1.61% QoQ",
     "Completed unsold (現樓貨尾): 19,000 units, -5.00% QoQ",
-    "QoQ is against 2026/Mar.",
-    "Figures are rounded to the nearest thousand at source, so the smallest representable move is already several percent."
+    "QoQ is against 2026/Mar."
   ],
   "table": [{"quarter": "2026/Jun", "land_ready": 16000, "…": "…",
              "qoq": {"…": "…"}}],

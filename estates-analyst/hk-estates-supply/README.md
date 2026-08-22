@@ -171,7 +171,6 @@ right. There is no crawling and no archive trawling.
 
 ## No Telegram module
 
-There is no bot token here, no `sendMessage` wrapper, no HTTP client for one.
 Hermes owns the channel; these tools only ever hand back JSON and file paths.
 
 ## Tests

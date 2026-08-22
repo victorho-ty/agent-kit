@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# MCP server configs could hold literal API keys, ignore.
+.mcp.json

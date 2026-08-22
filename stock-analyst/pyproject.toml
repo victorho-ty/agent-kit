@@ -1,0 +1,14 @@
+# Not a real Python package.
+#
+# `alphavantage-mcp` reads its own version with a bare `open("pyproject.toml")`
+# (server.py:2154) -- a relative path, so it resolves against the *launching*
+# process's working directory rather than its own install. Claude Code starts
+# MCP servers from this profile root, so without a file here the server dies at
+# import with FileNotFoundError and never reaches the protocol handshake.
+#
+# The stock-desk bundle spawns its own MCP clients with cwd set to the bundle
+# root, so it is unaffected; this file exists solely for the interactive path.
+[project]
+name = "hermes-stock-analyst-profile"
+version = "0.1.0"
+description = "Shim so alphavantage-mcp can resolve a version string. Not packaged."

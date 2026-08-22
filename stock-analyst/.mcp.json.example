@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "sec-edgar": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/stefanoamorelli/sec-edgar-mcp.git",
+        "sec-edgar-mcp"
+      ],
+      "env": {
+        "SEC_EDGAR_USER_AGENT": "REPLACE ME (xxx@gmail.com)"
+      }
+    },
+
+    "yahoo-finance": {
+      "command": "uvx",
+      "args": ["--with", "mcp==1.19.0", "mcp-yahoo-finance"]
+    },
+
+    "alphavantage": {
+      "command": "uvx",
+      "args": ["--with", "python-dotenv", "--with", "mcp==1.19.0", "alphavantage-mcp"],
+      "env": {
+        "ALPHAVANTAGE_API_KEY": "REPLACE_WITH_YOUR_ALPHAVANTAGE_KEY"
+      }
+    }
+  }
+}
+

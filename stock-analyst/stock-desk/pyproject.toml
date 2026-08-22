@@ -1,0 +1,62 @@
+[project]
+name = "stock-desk"
+version = "0.1.0"
+description = "Swing-trading watchlist, breakout-setup detection and portfolio event alerting for the Hermes stock-analyst profile"
+requires-python = ">=3.12"
+
+# Four runtime dependencies, each earning its place:
+#
+# * `yfinance` is the primary provider: daily OHLCV, 52-week range, trailing and
+#   forward P/E, the earnings and ex-dividend calendar, and per-ticker news, for
+#   both US and HK listings, behind one unauthenticated interface. It scrapes an
+#   undocumented endpoint, so it breaks occasionally -- which is what the Stooq
+#   fallback is for. Stooq needs no dependency of its own; it serves CSV over
+#   plain `urllib`.
+# * `mplfinance` draws the candle-plus-volume panel natively. Hand-rolling it on
+#   raw matplotlib is about 150 lines of rectangle arithmetic that this replaces,
+#   and it pulls in matplotlib and pandas, which the chart layer wants anyway.
+# * `exchange_calendars` knows when NYSE, NASDAQ and HKEX are open, including
+#   holidays and half-days. Without it a "30 minutes before the open" report
+#   fires on Christmas and reads a stale bar as a real one.
+# * `tzdata` is data, not code: zoneinfo prefers the operating system's copy and
+#   only falls back to this one, which is what makes Asia/Hong_Kong resolve on
+#   Windows and in minimal containers.
+#
+# * `mcp` is the client half of the Model Context Protocol. News, sentiment and
+#   macro all arrive from MCP servers, and this is what lets *Python* hold the
+#   client end of that pipe rather than the agent -- the difference between
+#   ~128k tokens a day of raw feed JSON crossing model context and none of it.
+#   Pinned below 2.0: the servers this profile uses are built against the 1.x
+#   low-level `Server` API, which 2.0 removed.
+#
+# Indicators and setup detection deliberately depend on none of these. They are
+# pure stdlib over lists of floats, so the whole test suite runs without pandas,
+# without a network, and without a market being open.
+dependencies = [
+    "yfinance>=0.2.40",
+    "mplfinance>=0.12.10b0",
+    "exchange-calendars>=4.5",
+    "tzdata>=2024.1",
+    "mcp>=1.19,<2",
+]
+
+[project.scripts]
+stockctl = "stock_desk.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["stock_desk", "stock_desk.config", "stock_desk.providers"]
+
+[tool.setuptools.package-data]
+"stock_desk.config" = ["watchlist.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]

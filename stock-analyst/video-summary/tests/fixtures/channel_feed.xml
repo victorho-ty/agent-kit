@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015"
+      xmlns:media="http://search.yahoo.com/mrss/"
+      xmlns="http://www.w3.org/2005/Atom">
+ <link rel="self" href="http://www.youtube.com/feeds/videos.xml?channel_id=UCnexoc6tvesvcCEzZhmI-Ag"/>
+ <id>yt:channel:nexoc6tvesvcCEzZhmI-Ag</id>
+ <yt:channelId>nexoc6tvesvcCEzZhmI-Ag</yt:channelId>
+ <title>Example Rates Desk</title>
+ <link rel="alternate" href="https://www.youtube.com/channel/UCnexoc6tvesvcCEzZhmI-Ag"/>
+ <author>
+  <name>Example Rates Desk</name>
+  <uri>https://www.youtube.com/channel/UCnexoc6tvesvcCEzZhmI-Ag</uri>
+ </author>
+ <published>2020-08-26T02:22:57+00:00</published>
+ <entry>
+  <id>yt:video:aaaaaaaaaa1</id>
+  <yt:videoId>aaaaaaaaaa1</yt:videoId>
+  <yt:channelId>UCnexoc6tvesvcCEzZhmI-Ag</yt:channelId>
+  <title>The 10&#8211;Year Yield&#8217;s Next Move</title>
+  <link rel="alternate" href="https://www.youtube.com/watch?v=aaaaaaaaaa1"/>
+  <author>
+   <name>Example Rates Desk</name>
+   <uri>https://www.youtube.com/channel/UCnexoc6tvesvcCEzZhmI-Ag</uri>
+  </author>
+  <published>2026-08-23T12:00:00+00:00</published>
+  <updated>2026-08-23T12:30:00+00:00</updated>
+  <media:group>
+   <media:title>The 10&#8211;Year Yield&#8217;s Next Move</media:title>
+   <media:content url="https://www.youtube.com/v/aaaaaaaaaa1?version=3" type="application/x-shockwave-flash" width="640" height="390"/>
+   <media:thumbnail url="https://i4.ytimg.com/vi/aaaaaaaaaa1/hqdefault.jpg" width="480" height="360"/>
+   <media:description>Where the long end goes after this week's auction.</media:description>
+  </media:group>
+ </entry>
+ <entry>
+  <id>yt:video:bbbbbbbbbb2</id>
+  <yt:videoId>bbbbbbbbbb2</yt:videoId>
+  <yt:channelId>UCnexoc6tvesvcCEzZhmI-Ag</yt:channelId>
+  <title>Sponsored: our broker partner</title>
+  <link rel="alternate" href="https://www.youtube.com/watch?v=bbbbbbbbbb2"/>
+  <published>2026-08-22T09:00:00+00:00</published>
+  <media:group>
+   <media:title>Sponsored: our broker partner</media:title>
+   <media:thumbnail url="https://i4.ytimg.com/vi/bbbbbbbbbb2/hqdefault.jpg" width="480" height="360"/>
+   <media:description>A paid placement.</media:description>
+  </media:group>
+ </entry>
+ <entry>
+  <id>yt:video:cccccccccc3</id>
+  <yt:videoId>cccccccccc3</yt:videoId>
+  <yt:channelId>UCnexoc6tvesvcCEzZhmI-Ag</yt:channelId>
+  <title>60 second CD ladder</title>
+  <link rel="alternate" href="https://www.youtube.com/watch?v=cccccccccc3"/>
+  <published>2026-08-21T09:00:00+00:00</published>
+  <media:group>
+   <media:title>60 second CD ladder</media:title>
+   <media:thumbnail url="https://i4.ytimg.com/vi/cccccccccc3/hqdefault.jpg" width="480" height="360"/>
+   <media:description>Short.</media:description>
+  </media:group>
+ </entry>
+</feed>

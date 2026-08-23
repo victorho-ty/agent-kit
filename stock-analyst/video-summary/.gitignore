@@ -1,0 +1,12 @@
+# Runtime state. The database and the transcript cache live outside the bundle
+# by default (~/.local/share/hermes-video-summary), but an operator who points
+# VIDEO_SUMMARY_DB at the bundle root should not commit them either.
+*.db
+*.db-journal
+*.db-wal
+transcripts/
+
+.venv/
+*.egg-info/
+__pycache__/
+.pytest_cache/

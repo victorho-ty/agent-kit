@@ -1,0 +1,50 @@
+// A feed is not trusted until it has been checked against the live document:
+//     video-summary check --feed <name> --dry-run
+//
+// Field reference: skills/video-summary/references/feed-config.md
+{
+  "timezone": "Asia/Hong_Kong",
+  "request_delay_seconds": 2.0,
+
+  // How many videos one check hands over. The rest stay pending and come round
+  // on the next one -- a backlog is drained, never dropped.
+  "max_per_check": 5,
+
+  // What the agent is told to write to, per video. Telegram's hard limit is
+  // 4096; this is a choice about what someone reads on a phone.
+  "summary_char_cap": 800,
+
+  // Preferred caption languages, best first. A manually written track is always
+  // preferred over an auto-generated one in the same language.
+  "transcript_languages": ["en", "en-US", "en-GB", "zh-Hant", "zh-Hans", "zh"],
+
+  // Captions appear minutes after an upload, not at it. A video with none yet
+  // is held back this long before being sent without a summary.
+  "transcript_grace_minutes": 120,
+  "max_transcript_attempts": 3,
+
+  // One extra request per new video to label it short or long. Set false to
+  // skip it; every video then reports kind "unknown".
+  "detect_shorts": true,
+
+  // Dropped outright, whatever else the entry says. Substring match, case
+  // folded, over title and description. Keep the terms specific.
+  "exclude": [],
+
+  "feeds": [
+    {
+      "name": "DiamondNestegg",
+      "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UCnexoc6tvesvcCEzZhmI-Ag",
+      "note": "US Treasuries, bond ladders, CDs, money market and fixed income mechanics",
+      "max_items": 10,
+      "enabled": true
+    },
+    {
+      "name": "GarethSoloway",
+      "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UCwTu6kD2igaLMpxswtcdxlg",
+      "note": "Equities, Cryptos, swing-trades",
+      "max_items": 10,
+      "enabled": true
+    }
+  ]
+}

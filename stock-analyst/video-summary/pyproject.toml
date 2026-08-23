@@ -1,0 +1,47 @@
+[project]
+name = "video-summary"
+version = "0.1.0"
+description = "Watches configured YouTube channel feeds, pulls transcripts, and hands new videos to a Hermes agent to summarise for a financial-markets reader"
+requires-python = ">=3.12"
+
+# Two runtime dependencies, each earning its place:
+#
+# * `youtube-transcript-api` is the only part of this bundle that could not be
+#   written against the standard library in an afternoon. YouTube's timedtext
+#   endpoint needs a per-video token lifted out of the watch page, and the
+#   shape of that page changes without notice; this package tracks it. The
+#   `youtube-content` skill does the same job for an agent, but a skill is
+#   instructions for a model, not something a subprocess can call -- so the
+#   deterministic path is a library.
+# * `tzdata` is data, not code: zoneinfo prefers the operating system's copy and
+#   only falls back to this one, which is what makes Asia/Hong_Kong resolve on
+#   Windows and in minimal containers.
+#
+# The feed itself is Atom and is parsed with the standard library's xml.etree.
+# A feed reader would be a third dependency for about thirty lines of work, and
+# YouTube's feed shape is fixed by YouTube, not by a theme.
+dependencies = [
+    "youtube-transcript-api>=1.0",
+    "tzdata>=2024.1",
+]
+
+[project.scripts]
+video-summary = "video_summary.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["video_summary", "video_summary.config"]
+
+[tool.setuptools.package-data]
+"video_summary.config" = ["feeds.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]

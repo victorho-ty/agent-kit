@@ -10,8 +10,9 @@ What the feed gives, and what it does not:
 * ``yt:videoId`` is the identity, and it is global. Two feeds carrying the same
   video are one video, which is why the database keys on it rather than on
   ``(feed, url)``.
-* ``media:thumbnail@url`` is a real, hotlinkable image url. It is handed to
-  Telegram as a string; nothing here downloads an image.
+* ``media:thumbnail@url`` is a real, hotlinkable image url. It is carried
+  through for triage and is **not** sent: Telegram builds its own preview card
+  from the video link. Nothing here downloads an image either way.
 * ``published`` is the source's own words, kept as a string and never parsed
   into a datetime. Nothing in this bundle needs the value -- ordering is by the
   order we first saw things -- so parsing it would only create a way to be
@@ -35,7 +36,8 @@ MEDIA = "{http://search.yahoo.com/mrss/}"
 WATCH_URL = "https://www.youtube.com/watch?v={video_id}"
 SHORTS_URL = "https://www.youtube.com/shorts/{video_id}"
 # YouTube always serves this, for every video, at a fixed url. It is the
-# fallback when an entry somehow arrives without a media:thumbnail.
+# fallback when an entry somehow arrives without a media:thumbnail, so the field
+# is never null for a video that exists.
 FALLBACK_THUMBNAIL = "https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
 
 

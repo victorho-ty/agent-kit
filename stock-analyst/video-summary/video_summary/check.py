@@ -328,7 +328,7 @@ def check(
 
 
 def _for_agent(video, config) -> dict:
-    """One video as the agent receives it: facts, a thumbnail url, and a path.
+    """One video as the agent receives it: facts, a link, and a transcript path.
 
     ``feed_note`` is the operator's own words about what the channel covers,
     carried through from the config so the model has the context a subscriber

@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS video (
   channel_url          TEXT,
   title                TEXT NOT NULL,
   url                  TEXT NOT NULL,
-  thumbnail_url        TEXT,                          -- handed to Telegram as a string
+  thumbnail_url        TEXT,                          -- triage only; the link is what gets sent
   kind                 TEXT NOT NULL DEFAULT 'unknown',  -- short | video | unknown
   published_text       TEXT,                          -- YouTube's own words, never parsed
   description          TEXT,

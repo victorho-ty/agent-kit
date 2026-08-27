@@ -38,8 +38,9 @@ DEFAULT_MAX_ITEMS = 15
 # rest stay pending -- the ledger loses nothing.
 DEFAULT_MAX_PER_CHECK = 5
 # The cap the agent is told to write to. Telegram's own limit is 4096
-# characters, and a caption on a photo is 1024; 800 is a deliberate choice about
-# what a person reads standing up, not a protocol limit.
+# characters; 800 is a deliberate choice about what a person reads standing up,
+# not a protocol limit. One message per video carries both the summary and the
+# link -- there is no photo send, so nothing here is near a wall.
 DEFAULT_SUMMARY_CHAR_CAP = 800
 # Captions are generated after upload, not at it. A video whose transcript is
 # not ready is held back for this long rather than being sent without one --

@@ -99,6 +99,10 @@ feed also carries `next_eligible`; a `zero_yield` one carries a `message`.
 `videos` is what to send, oldest first, at most `max_per_check` (5). It is
 **never stamped by `check`** — see `mark`.
 
+`thumbnail_url` is returned for triage and is **not sent**. One `sendMessage`
+carrying the `url` is the whole delivery: Telegram renders its own preview card
+from the link. There is no `sendPhoto` step.
+
 `held_for_transcript` counts pending videos whose captions have not appeared
 yet. They are not in `videos` and need no comment.
 

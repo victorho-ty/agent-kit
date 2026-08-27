@@ -30,7 +30,7 @@ against an unchanged feed is a few hundred bytes and no parsing.
 news-radar's `digest --commit` stamps before returning, because a digest is one
 message: it either goes or it does not.
 
-Here a run sends up to five photo-plus-message pairs, and the third can fail.
+Here a run sends up to five messages, and the third can fail.
 Both batch strategies are wrong:
 
 - stamp up front and a failure loses every video after it, permanently, with no
@@ -149,16 +149,25 @@ There is no Telegram client anywhere in this package, matching `news-radar`,
 `coupon-tracker` and `household-expenses`. The agent already owns the channel,
 the chat id and the credentials.
 
-Two delivery details are nonetheless pinned in SKILL.md, because getting them
-wrong is expensive and invisible:
+One delivery detail is nonetheless pinned in SKILL.md, because getting it wrong
+is expensive and invisible: **one `sendMessage` per video, carrying the url, and
+never `sendPhoto`.**
 
-- **the thumbnail is passed as a URL string to `sendPhoto`.** Telegram fetches
-  it. Downloading the image to disk and posting multipart works, costs a request
-  and a temp file, and buys nothing;
-- **photo first, message second, rather than a photo caption.** A caption is
-  capped at 1024 characters against a message's 4096, and the cap this skill
-  actually wants — 800 — is a decision about reading on a phone, not a protocol
-  limit. Keeping them separate means the cap can move without hitting a wall.
+The bundle extracts `thumbnail_url` from the feed and stores it, and the first
+draft of the skill sent it as a photo before the summary. That was redundant:
+Telegram builds its own preview card — thumbnail, title, channel — from any
+YouTube link in a message body. The photo send bought a second notification
+showing the same image, from a url that can rot independently of the video.
+
+The field is kept in the payload rather than removed. It costs one attribute in
+a feed we already parse, it is the honest answer to "what image does this video
+have", and it is the fallback if a client ever suppresses previews. SKILL.md
+says plainly not to send it.
+
+A photo *caption* was the other candidate and is worse still: captions cap at
+1024 characters against a message's 4096, which would weld the skill's 800 —
+a decision about reading on a phone — to a protocol limit it has nothing to do
+with.
 
 ## 9. Failure isolation, copied wholesale
 

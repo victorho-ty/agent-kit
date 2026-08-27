@@ -4,8 +4,8 @@ An agent skill plus the deterministic Python tools behind it. A check runs every
 X hours over a configured list of YouTube channel feeds, stores what is new,
 and fetches the transcript of anything it has not sent yet. The agent reads that
 transcript and writes what a swing trader needs to know from it — instruments,
-levels, claims and who made them — then sends the thumbnail and the summary over
-Telegram. It never decides what is new, and it never computes a number.
+levels, claims and who made them — then sends it over Telegram as one message
+with the link. It never decides what is new, and it never computes a number.
 
 ```
 video-summary/
@@ -117,7 +117,7 @@ comments are stripped before parsing, so the file can carry disabled examples.
 | `max_per_check` | videos handed over per run; the rest stay pending |
 | `summary_char_cap` | what the agent is told to write to, per video |
 | `transcript_grace_minutes` | how long a caption-less video is held before going out bare |
-| `transcript` | `false` sends title, link and thumbnail only |
+| `transcript` | `false` sends the title and the link only |
 | `min_interval_minutes` | a floor on how often *this* feed is fetched, not a schedule |
 | `enabled` | `false` pauses a feed without losing its history |
 
@@ -247,7 +247,7 @@ The ones that matter most:
 - **Auto-generated captions are frequently wrong** about tickers and numbers that
   sound alike. The agent is told to say the transcript is unclear rather than
   guess; nothing here can do better.
-- **A video with no captions at all gets no summary.** It goes out as a title, a
-  link and a thumbnail, and says so.
+- **A video with no captions at all gets no summary.** It goes out as a title
+  and a link, and says so.
 - **Videos are ordered by when they were first seen**, not by publication time,
   because `published_text` is never parsed.

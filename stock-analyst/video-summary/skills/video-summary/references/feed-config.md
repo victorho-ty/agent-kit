@@ -29,7 +29,7 @@ cannot express is per-feed politeness, so that is the one knob provided below.
 | `name` | required | unique; how every other command refers to this feed |
 | `url` | required | a real YouTube feed url (see below) |
 | `note` | none | what this channel covers, **in words the agent reads** |
-| `transcript` | `true` | `false` sends title, link and thumbnail only |
+| `transcript` | `true` | `false` sends the title and the link only |
 | `min_interval_minutes` | `0` | a floor on how often this feed is fetched |
 | `max_items` | `15` | entries taken from one document |
 | `enabled` | `true` | `false` pauses a feed without losing its history |

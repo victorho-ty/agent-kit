@@ -54,15 +54,16 @@ script).
 | `HOUSEHOLD_EXPENSES_CURRENCY` | `HKD` |
 | `HOUSEHOLD_EXPENSES_REPORT_DIR` | `<db dir>/reports` |
 
-The timezone matters: months and days are bucketed from the message timestamp
-converted to local time, so a message sent at 00:30 lands on the right day.
+The timezone matters: months and days are bucketed from the stored timestamp
+converted to local time, so a message sent at 00:30 lands on the right day. `add`
+stamps the row itself; `--timestamp` is only for back-filling past spending.
 
 ## How it fits together
 
 Hermes owns the Telegram connection and passes each message through:
 
 ```bash
-python -m expense_tracker add --member "Alice" --timestamp "2026-08-02T19:14:00+08:00" \
+python -m expense_tracker add --member "Alice" \
   --message-id "tg:44821" --text "haircut \$300; dinner \$50; Bus \$4.8; MTR \$5.6; Books \$150"
 ```
 

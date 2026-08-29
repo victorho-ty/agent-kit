@@ -43,19 +43,20 @@ Optional environment overrides: `HOUSEHOLD_EXPENSES_DB` (default
 ## Recording an expense message
 
 When a member sends spending, pass the message through verbatim along with **the
-sender and the inbound message timestamp**. Do not pre-parse the text, do not split
-items yourself, do not convert the amounts.
+sender**. Do not pre-parse the text, do not split items yourself, do not convert
+the amounts.
 
 ```bash
 expense-tracker add \
   --member "Alice" \
-  --timestamp "2026-08-02T19:14:00+08:00" \
   --message-id "tg:44821" \
   --text "haircut \$300; dinner \$50; Bus \$4.8; MTR \$5.6; Books \$150"
 ```
 
-- `--timestamp` accepts ISO8601 or a unix epoch. Always pass the real message
-  timestamp; the tool buckets days and months from it, not from the current time.
+- **Omit `--timestamp`.** The tool stamps the row itself in `Asia/Hong_Kong`.
+  Never shell out to `date` for it. Pass it (ISO8601 or unix epoch) only when the
+  spending happened at some other time — a queued message you are draining late,
+  or a member reporting past spending.
 - `--message-id` makes the call idempotent — re-sending the same message stores
   nothing twice. Pass it whenever the platform gives you one.
 - If a member's Telegram handle differs from the name they should appear under,
@@ -63,8 +64,8 @@ expense-tracker add \
 - The parser splits items ONLY on `;`, newlines, `、` and non-thousands commas —
   NOT on "and" or spaces. `MTR $5.9 and bus $4.8` parses as ONE item (last
   amount wins, description mangled). If a member lists items without separators,
-  send each item as its own `add` call with the same timestamp/member instead of
-  rewording the text.
+  send each item as its own `add` call with the same member instead of rewording
+  the text.
 
 ### The self-improving categorisation loop
 

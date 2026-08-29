@@ -44,6 +44,14 @@
       "name": "GarethSoloway",
       "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UCwTu6kD2igaLMpxswtcdxlg",
       "note": "Equities, Cryptos, swing-trades",
+      "exclude_shorts": false,
+      "max_items": 10,
+      "enabled": true
+    },
+    {
+      "name": "ClearValueInvesting",
+      "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UCigUBIf-zt_DA6xyOQtq2WA",
+      "note": "Fed policy and rates decisions, inflation, macroeconomics",
       "max_items": 10,
       "enabled": true
     }

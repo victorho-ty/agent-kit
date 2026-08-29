@@ -55,12 +55,14 @@ video-summary check --ignore-throttle     # fetch even inside min_interval_minut
       "entries_seen": 15,
       "videos_new": 1,
       "excluded": 0,
+      "shorts_excluded": 2,
       "candidates": []
     }
   ],
   "feed_failures": [],
   "totals": {
-    "feeds_checked": 1, "entries_seen": 15, "videos_new": 1, "videos_excluded": 0,
+    "feeds_checked": 1, "entries_seen": 15, "videos_new": 1, "videos_excluded": 2,
+    "videos_excluded_keyword": 0, "videos_excluded_shorts": 2,
     "errors": 0, "transcripts_ok": 1, "transcripts_failed": 0, "transcripts_attempted": 1
   },
   "videos": [
@@ -107,7 +109,16 @@ from the link. There is no `sendPhoto` step.
 yet. They are not in `videos` and need no comment.
 
 `candidates` is populated only by `--dry-run`, and carries `video_id`, `title`,
-`url`, `thumbnail_url`, `published_text` and `would_send`.
+`url`, `thumbnail_url`, `published_text`, `kind`, `excluded_as_short` and
+`would_send`. A dry run resolves `kind`, so it tells the truth about what the
+Shorts filter would drop — which is the point of running it before enabling a
+feed.
+
+`excluded` counts the keyword filter; `shorts_excluded` counts Shorts dropped by
+`exclude_shorts`. Both are dropped **before** storage, so neither appears in
+`videos` and neither costs a transcript fetch. `totals.videos_excluded` is the
+sum of the two, matching the `runs` column; the two `videos_excluded_*` keys
+break it down.
 
 `feed_failures` entries carry `feed`, `reason` (`fetch_failed` | `parse_failed`
 | `zero_yield`) and `message`.
@@ -137,7 +148,8 @@ video-summary list --all      # include disabled
 ```
 
 Returns the config as loaded — `timezone`, `max_per_check`, `summary_char_cap`,
-`transcript_languages`, `transcript_grace_minutes`, `detect_shorts`, `exclude` —
+`transcript_languages`, `transcript_grace_minutes`, `exclude_shorts`,
+`exclude` —
 plus one entry per feed combining its config (`name`, `url`, `channel_id`,
 `note`, `transcript`, `min_interval_minutes`, `max_items`, `enabled`) with its
 health: `seeded`, `last_ok_at`, `consecutive_failures`, `last_error`,
@@ -230,7 +242,7 @@ CREATE TABLE runs (
   feeds_checked       INTEGER NOT NULL DEFAULT 0,
   entries_seen        INTEGER NOT NULL DEFAULT 0,
   videos_new          INTEGER NOT NULL DEFAULT 0,
-  videos_excluded     INTEGER NOT NULL DEFAULT 0,
+  videos_excluded     INTEGER NOT NULL DEFAULT 0,   -- keyword + Shorts, both dropped pre-storage
   transcripts_ok      INTEGER NOT NULL DEFAULT 0,
   transcripts_failed  INTEGER NOT NULL DEFAULT 0,
   errors              INTEGER NOT NULL DEFAULT 0,

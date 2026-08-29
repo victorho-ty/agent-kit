@@ -135,7 +135,7 @@ def test_the_same_video_in_two_feeds_is_one_video(
                              "?channel_id=UCnexoc6tvesvcCEzZhmI-Ag"},
         {"name": "b", "url": "https://www.youtube.com/feeds/videos.xml"
                              "?playlist_id=PLxxxxxxxxxxxxxxxxxx"},
-    ], detect_shorts=False, exclude=[], max_per_check=5)
+    ], exclude=[], max_per_check=5)
 
     def fetcher(url, **_kwargs):
         return Response(url=url, status=200, text=feed_document, etag=None, last_modified=None)
@@ -156,7 +156,7 @@ def test_a_dead_feed_does_not_take_the_others_down(
                                 "?channel_id=UCnexoc6tvesvcCEzZhmI-Ag"},
         {"name": "gone", "url": "https://www.youtube.com/feeds/videos.xml"
                                 "?channel_id=UCaaaaaaaaaaaaaaaaaaaaaa"},
-    ], detect_shorts=False, exclude=[])
+    ], exclude=[])
 
     def fetcher(url, **_kwargs):
         if "UCaaaa" in url:
@@ -177,22 +177,78 @@ def test_dry_run_writes_nothing(conn, config, now, fetcher, transcriber):
     assert db.recent_videos(conn, limit=50) == []
 
 
-def test_shorts_are_labelled_when_asked(conn, config_factory, now, feed_document, transcriber):
-    """The feed does not say; one redirect does. A label, never a filter."""
-    config = config_factory(detect_shorts=True, exclude=[])
+def _shorts_resolver(url):
+    """/shorts/<id> stays put for a Short, redirects to /watch for anything else."""
+    return url if "shortshort9" in url else url.replace("/shorts/", "/watch?v=")
+
+
+def _two_runs(conn, config, now, feed_document, transcriber, resolver):
+    """Seed, then deliver one fresh video whose id says whether it is a Short."""
     responses = [feed_document, feed_document.replace("aaaaaaaaaa1", "shortshort9")]
 
     def fetcher(url, **_kwargs):
         return Response(url=url, status=200, text=responses.pop(0), etag=None, last_modified=None)
 
-    def resolver(url):
-        # /shorts/<id> stays put for a Short, redirects to /watch for anything else.
-        return url if "shortshort9" in url else url.replace("/shorts/", "/watch?v=")
-
     run_check(conn, config, now, fetcher=fetcher, transcriber=transcriber, resolver=resolver)
-    payload = run_check(conn, config, now, fetcher=fetcher, transcriber=transcriber, resolver=resolver)
+    return run_check(conn, config, now, fetcher=fetcher, transcriber=transcriber, resolver=resolver)
+
+
+def test_a_dry_run_resolves_kind_even_on_a_cold_start(conn, config, now, feed_document, transcriber):
+    """The one command whose whole job is answering "what would this feed do"."""
+    def fetcher(url, **_kwargs):
+        return Response(url=url, status=200, text=feed_document, etag=None, last_modified=None)
+
+    payload = run_check(
+        conn, config, now, fetcher=fetcher, transcriber=transcriber,
+        resolver=lambda url: url if "cccccccccc3" in url else url.replace("/shorts/", "/watch?v="),
+        dry_run=True,
+    )
+    candidates = {c["video_id"]: c for c in payload["feeds"][0]["candidates"]}
+    assert candidates["cccccccccc3"]["kind"] == "short"
+    assert candidates["cccccccccc3"]["excluded_as_short"] is True
+    assert candidates["aaaaaaaaaa1"]["kind"] == "video"
+    assert payload["feeds"][0]["shorts_excluded"] == 1
+
+
+def test_shorts_are_excluded_by_default(conn, config_factory, now, feed_document, transcriber):
+    """Not stored, not transcribed, not sent -- one redirect and nothing else."""
+    config = config_factory(exclude=[])
+    assert config.feeds[0].exclude_shorts is True
+
+    payload = _two_runs(conn, config, now, feed_document, transcriber, _shorts_resolver)
+
+    assert payload["videos"] == []
+    assert payload["feeds"][0]["shorts_excluded"] == 1
+    assert payload["totals"]["videos_excluded_shorts"] == 1
+    # No row at all: a Short the operator does not want never enters the ledger.
+    assert db.find_video(conn, "shortshort9") is None
+
+
+def test_a_feed_can_ask_for_its_shorts(conn, config_factory, now, feed_document, transcriber):
+    config = config_factory(exclude=[], feeds=[{
+        "name": "rates-desk",
+        "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UCnexoc6tvesvcCEzZhmI-Ag",
+        "exclude_shorts": False,
+    }])
+
+    payload = _two_runs(conn, config, now, feed_document, transcriber, _shorts_resolver)
 
     assert [video["kind"] for video in payload["videos"]] == ["short"]
-    # Videos absorbed by the cold start are never resolved: fifteen redirects to
-    # label a back catalogue nobody will be shown is fifteen wasted requests.
+    assert payload["feeds"][0]["shorts_excluded"] == 0
+
+
+def test_an_unresolved_kind_is_never_excluded(conn, config_factory, now, feed_document, transcriber):
+    """A failed redirect must not silently drop a video."""
+    config = config_factory(exclude=[])
+
+    payload = _two_runs(conn, config, now, feed_document, transcriber, lambda url: None)
+
+    assert [video["kind"] for video in payload["videos"]] == ["unknown"]
+    assert payload["feeds"][0]["shorts_excluded"] == 0
+
+
+def test_a_cold_start_never_resolves_kind(conn, config_factory, now, feed_document, transcriber):
+    """Fifteen redirects to label a back catalogue nobody will be shown is waste."""
+    config = config_factory(exclude=[])
+    _two_runs(conn, config, now, feed_document, transcriber, _shorts_resolver)
     assert db.find_video(conn, "cccccccccc3").kind == "unknown"

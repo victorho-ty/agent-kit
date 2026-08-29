@@ -43,7 +43,6 @@ def config_factory(tmp_path):
             "timezone": "Asia/Hong_Kong",
             "request_delay_seconds": 0,
             "max_per_check": 5,
-            "detect_shorts": False,
             "exclude": ["sponsored"],
             "feeds": [
                 {

@@ -52,6 +52,11 @@ DEFAULT_TRANSCRIPT_GRACE_MINUTES = 120
 # is a request YouTube did not ask for.
 DEFAULT_MAX_TRANSCRIPT_ATTEMPTS = 3
 DEFAULT_TRANSCRIPT_LANGUAGES = ("en", "en-US", "en-GB", "zh-Hant", "zh-Hans", "zh")
+# Shorts are excluded by default. A sixty-second clip is a trailer for a channel
+# rather than a piece of research, and a desk that wanted them would say so. Set
+# per feed, because the answer is per channel: some channels put real content in
+# Shorts and some use them purely as advertising.
+DEFAULT_EXCLUDE_SHORTS = True
 
 # A channel feed url carries the channel id in a query parameter; a playlist
 # feed carries a playlist id. Either is accepted, and anything else is a config
@@ -69,6 +74,9 @@ class Feed:
     url: str
     note: str | None = None
     transcript: bool = True
+    # Always concrete by the time a Feed exists: load_config fills it in from the
+    # global default when the entry does not say.
+    exclude_shorts: bool = DEFAULT_EXCLUDE_SHORTS
     min_interval_minutes: int = 0
     max_items: int = DEFAULT_MAX_ITEMS
     enabled: bool = True
@@ -113,6 +121,7 @@ class Feed:
             "channel_id": self.channel_id,
             "note": self.note,
             "transcript": self.transcript,
+            "exclude_shorts": self.exclude_shorts,
             "min_interval_minutes": self.min_interval_minutes,
             "max_items": self.max_items,
             "enabled": self.enabled,
@@ -132,7 +141,7 @@ class FeedConfig:
     transcript_languages: tuple[str, ...]
     transcript_grace_minutes: int
     max_transcript_attempts: int
-    detect_shorts: bool
+    exclude_shorts: bool
     path: Path
 
     def tzinfo(self) -> ZoneInfo:
@@ -168,9 +177,11 @@ def strip_comments(source: str) -> str:
     return "\n".join("" if line.lstrip().startswith("//") else line for line in source.splitlines())
 
 
-def _load_feed(entry: object) -> Feed:
+def _load_feed(entry: object, default_exclude_shorts: bool) -> Feed:
     if not isinstance(entry, dict):
         raise ConfigError(f"every feed must be a JSON object, got {entry!r}")
+    entry = dict(entry)
+    entry.setdefault("exclude_shorts", default_exclude_shorts)
     try:
         return Feed(**entry)
     except TypeError as exc:
@@ -192,7 +203,8 @@ def load_config(path: Path | str | None = None) -> FeedConfig:
     if not isinstance(raw, dict):
         raise ConfigError(f"{path}: the config must be a JSON object")
 
-    feeds = tuple(_load_feed(entry) for entry in raw.get("feeds", []))
+    exclude_shorts = bool(raw.get("exclude_shorts", DEFAULT_EXCLUDE_SHORTS))
+    feeds = tuple(_load_feed(entry, exclude_shorts) for entry in raw.get("feeds", []))
     duplicate = _first_duplicate(feed.name for feed in feeds)
     if duplicate:
         raise ConfigError(f"{path}: duplicate feed name {duplicate!r}")
@@ -244,7 +256,7 @@ def load_config(path: Path | str | None = None) -> FeedConfig:
         transcript_languages=languages,
         transcript_grace_minutes=grace,
         max_transcript_attempts=attempts,
-        detect_shorts=bool(raw.get("detect_shorts", True)),
+        exclude_shorts=exclude_shorts,
         path=path,
     )
 

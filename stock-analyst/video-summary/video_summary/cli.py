@@ -153,7 +153,6 @@ def _cmd_feeds(args, config, conn, now) -> int:
         "summary_char_cap": config.summary_char_cap,
         "transcript_languages": list(config.transcript_languages),
         "transcript_grace_minutes": config.transcript_grace_minutes,
-        "detect_shorts": config.detect_shorts,
         "exclude": list(config.exclude_keywords),
         "feeds": [
             {

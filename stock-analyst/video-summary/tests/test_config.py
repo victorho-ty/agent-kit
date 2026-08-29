@@ -65,6 +65,24 @@ def test_comments_are_stripped_but_urls_survive(tmp_path):
     assert load_config(path).feeds[0].url == FEED_URL
 
 
+def test_shorts_are_excluded_unless_a_feed_says_otherwise(tmp_path):
+    config = load_config(write(tmp_path, {"feeds": [
+        {"name": "a", "url": FEED_URL},
+        {"name": "b", "url": FEED_URL.replace("UCnexoc6", "UCbbbbbb"), "exclude_shorts": False},
+    ]}))
+    assert config.exclude_shorts is True
+    assert [feed.exclude_shorts for feed in config.feeds] == [True, False]
+
+
+def test_a_global_exclude_shorts_moves_the_default(tmp_path):
+    """One key flips every feed that has not said otherwise."""
+    config = load_config(write(tmp_path, {"exclude_shorts": False, "feeds": [
+        {"name": "a", "url": FEED_URL},
+        {"name": "b", "url": FEED_URL.replace("UCnexoc6", "UCbbbbbb"), "exclude_shorts": True},
+    ]}))
+    assert [feed.exclude_shorts for feed in config.feeds] == [False, True]
+
+
 def test_unknown_feed_name_is_named_in_the_error(tmp_path):
     config = load_config(write(tmp_path, {"feeds": [{"name": "a", "url": FEED_URL}]}))
     with pytest.raises(ConfigError, match="unknown feed"):

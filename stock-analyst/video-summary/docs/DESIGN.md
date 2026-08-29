@@ -101,25 +101,45 @@ regardless, with `transcript.status` saying why there is nothing to summarise.
 `max_transcript_attempts` (3) is the other half: a channel with captions
 genuinely disabled must not be asked about every two hours forever.
 
-## 6. Short versus long costs one request, and is a label
+## 6. Short versus long costs one request, and is a filter
 
 The feed does not carry duration and does not distinguish Shorts. There is no
 free API that answers either without a key.
 
 What does answer it: `/shorts/<id>` stays put for a Short and redirects to
-`/watch` for anything else. One HEAD request per *new* video, and only when
-`detect_shorts` is on.
+`/watch` for anything else. One HEAD request per *new* video, always, on every
+feed.
 
-Two constraints on it, both in the code:
+**Shorts are excluded by default**, per feed. That reverses this section's
+original position — that the operator subscribed to a channel, not to a format —
+and the reversal is deliberate: in practice most channels use Shorts to advertise
+their long videos, so the default that respects the operator's attention is to
+drop them and let a feed opt back in with `"exclude_shorts": false`.
 
-- **failure is `unknown`, never a dropped video.** A label is not worth losing
-  content over;
+The filter runs **before the insert**, not at release: an unwanted Short costs one
+redirect and then nothing at all — no row, no transcript fetch, no ledger entry.
+That ordering is the whole value, given a caption fetch is the expensive and
+blockable step.
+
+Detection has no configuration knob, and briefly had one. A `detect_shorts` flag
+existed while the label was only a label, and survived one revision as "label the
+videos I am not filtering". It was removed because a knob that can switch
+detection off is a knob that can silently disable a filter the operator asked
+for, and because the thing it saved — one HEAD request per new video — is not
+worth a second setting to reason about. Resolution is now unconditional.
+
+Three constraints, all in the code:
+
+- **failure is `unknown`, and `unknown` is never excluded.** A video is never
+  lost to a label that could not be resolved;
 - **cold-start videos are never resolved.** Fifteen redirects to label a back
-  catalogue nobody will be shown is fifteen wasted requests.
+  catalogue nobody will be shown is fifteen wasted requests;
+- **`--dry-run` resolves anyway**, cold start included. It is the one command
+  typed by a person asking what a feed would do, and answering `unknown` to that
+  is answering nothing.
 
-The label reaches the agent so a sixty-second clip gets a two-sentence summary
-instead of a paragraph. It is never a filter — the operator subscribed to the
-channel, not to a format.
+The label also reaches the agent, so a sixty-second clip from a feed that keeps
+its Shorts gets a two-sentence summary rather than a paragraph.
 
 ## 7. Where the model is, and where it is not
 

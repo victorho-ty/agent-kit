@@ -96,7 +96,7 @@ comments are stripped before parsing, so the file can carry disabled examples.
   "max_per_check": 5,
   "summary_char_cap": 800,
   "transcript_grace_minutes": 120,
-  "detect_shorts": true,
+  "exclude_shorts": true,
   "exclude": [],
   "feeds": [
     {
@@ -118,6 +118,7 @@ comments are stripped before parsing, so the file can carry disabled examples.
 | `summary_char_cap` | what the agent is told to write to, per video |
 | `transcript_grace_minutes` | how long a caption-less video is held before going out bare |
 | `transcript` | `false` sends the title and the link only |
+| `exclude_shorts` | `true` by default; `false` on a feed keeps its Shorts |
 | `min_interval_minutes` | a floor on how often *this* feed is fetched, not a schedule |
 | `enabled` | `false` pauses a feed without losing its history |
 
@@ -241,9 +242,10 @@ The ones that matter most:
 
 ## Limitations
 
-- **No duration, and no reliable Short flag without a request.** The feed carries
-  neither. `detect_shorts` spends one redirect per new video to label it;
-  failures land as `kind: "unknown"`, and a video is never lost over a label.
+- **No duration, and no Short flag without a request.** The feed carries
+  neither, so one redirect per new video resolves it. Failures land as
+  `kind: "unknown"`, which is never excluded — a video is never lost to a label
+  that could not be resolved.
 - **Auto-generated captions are frequently wrong** about tickers and numbers that
   sound alike. The agent is told to say the transcript is unclear rather than
   guess; nothing here can do better.

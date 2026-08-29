@@ -23,9 +23,10 @@
   "transcript_grace_minutes": 120,
   "max_transcript_attempts": 3,
 
-  // One extra request per new video to label it short or long. Set false to
-  // skip it; every video then reports kind "unknown".
-  "detect_shorts": true,
+  // Shorts are dropped at the door. Set false here to keep them everywhere, or
+  // per feed below -- a channel that puts real content in Shorts is the case
+  // this exists for. Every new video is resolved short-or-long either way.
+  "exclude_shorts": true,
 
   // Dropped outright, whatever else the entry says. Substring match, case
   // folded, over title and description. Keep the terms specific.

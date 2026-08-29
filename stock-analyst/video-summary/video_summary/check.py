@@ -89,7 +89,7 @@ def _collect_feed(
                 "next_eligible": ready.isoformat(),
                 "entries_seen": 0,
                 "videos_new": 0,
-                "excluded": 0,
+                "excluded": 0, "shorts_excluded": 0,
                 "candidates": [],
             }
 
@@ -106,7 +106,7 @@ def _collect_feed(
             )
         return {
             "feed": feed.name, "status": "unchanged", "entries_seen": 0,
-            "videos_new": 0, "excluded": 0, "candidates": [],
+            "videos_new": 0, "excluded": 0, "shorts_excluded": 0, "candidates": [],
         }
 
     entries = feed_parser.parse(response.text, feed.name, max_items=feed.max_items)
@@ -122,14 +122,14 @@ def _collect_feed(
             )
         return {
             "feed": feed.name, "status": "zero_yield", "entries_seen": 0,
-            "videos_new": 0, "excluded": 0, "candidates": [],
+            "videos_new": 0, "excluded": 0, "shorts_excluded": 0, "candidates": [],
             "message": f"{feed.name} parsed but returned no entries; it returned "
                        f"{previous_yield} last time. Check the url.",
         }
 
     seeding = seed or not (state or {}).get("seeded")
 
-    new_count, excluded_count, candidates = 0, 0, []
+    new_count, excluded_count, shorts_count, candidates = 0, 0, 0, []
     # Oldest first, so ids ascend in publication order and a backlog drains the
     # way a person would expect to read it.
     for entry in reversed(entries):
@@ -140,6 +140,20 @@ def _collect_feed(
         if db.find_video(conn, entry.video_id):
             continue
 
+        # Resolved before the insert, because a Short the operator does not want
+        # should cost one redirect and nothing else -- no row, no transcript
+        # fetch, no place in a ledger it will never leave.
+        kind = "unknown"
+        if dry_run or not seeding:
+            # A cold start resolves nothing -- fifteen redirects to label a back
+            # catalogue nobody will be shown is fifteen wasted requests. A dry run
+            # is the exception: it is typed by a person asking what this feed
+            # would do, and answering "unknown" to that is answering nothing.
+            kind = feed_parser.kind_of(entry.video_id, resolver)
+        # `unknown` is never excluded. A failed redirect must not silently drop a
+        # video, exactly as a failed label never drops one.
+        is_excluded_short = kind == "short" and feed.exclude_shorts
+
         if dry_run:
             candidates.append({
                 "video_id": entry.video_id,
@@ -147,14 +161,20 @@ def _collect_feed(
                 "url": entry.url,
                 "thumbnail_url": entry.thumbnail_url,
                 "published_text": entry.published_text,
-                "would_send": not seeding,
+                "kind": kind,
+                "excluded_as_short": is_excluded_short,
+                "would_send": not seeding and not is_excluded_short,
             })
-            new_count += 1
+            if is_excluded_short:
+                shorts_count += 1
+            else:
+                new_count += 1
             continue
 
-        kind = "unknown"
-        if config.detect_shorts and not seeding:
-            kind = feed_parser.kind_of(entry.video_id, resolver)
+        if is_excluded_short:
+            shorts_count += 1
+            continue
+
         db.insert_video(conn, entry, now, run_id=run_id, kind=kind, summarised=seeding)
         if not feed.transcript:
             db.set_transcript_status(conn, entry.video_id, "skipped")
@@ -174,6 +194,7 @@ def _collect_feed(
         "entries_seen": len(entries),
         "videos_new": new_count,
         "excluded": excluded_count,
+        "shorts_excluded": shorts_count,
         "candidates": candidates,
     }
 
@@ -266,7 +287,7 @@ def check(
             failures.append({"feed": feed.name, "reason": reason, "message": exc.message})
             results.append({
                 "feed": feed.name, "status": "error", "entries_seen": 0,
-                "videos_new": 0, "excluded": 0, "candidates": [],
+                "videos_new": 0, "excluded": 0, "shorts_excluded": 0, "candidates": [],
             })
             if not dry_run:
                 db.record_feed_failure(conn, feed.name, now, exc.message)
@@ -278,11 +299,16 @@ def check(
         for name in zero_yield
     )
 
+    shorts_excluded = sum(row["shorts_excluded"] for row in results)
     counts = {
         "feeds_checked": len(results),
         "entries_seen": sum(row["entries_seen"] for row in results),
         "videos_new": sum(row["videos_new"] for row in results),
-        "videos_excluded": sum(row["excluded"] for row in results),
+        # The `runs` column means "seen but not stored", whichever filter did it.
+        # The payload below keeps the two reasons apart, because "this channel
+        # posts nothing but Shorts" and "this channel posts nothing" are
+        # different answers to the same question.
+        "videos_excluded": sum(row["excluded"] for row in results) + shorts_excluded,
         "errors": len(failures),
     }
 
@@ -319,7 +345,12 @@ def check(
         "summary_char_cap": config.summary_char_cap,
         "feeds": results,
         "feed_failures": failures,
-        "totals": {**counts, "transcripts_attempted": transcript_counts["transcripts_attempted"]},
+        "totals": {
+            **counts,
+            "videos_excluded_keyword": counts["videos_excluded"] - shorts_excluded,
+            "videos_excluded_shorts": shorts_excluded,
+            "transcripts_attempted": transcript_counts["transcripts_attempted"],
+        },
         "videos": [_for_agent(video, config) for video in videos],
         "held_for_transcript": held,
         **db.pending_count(conn),

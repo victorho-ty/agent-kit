@@ -108,6 +108,12 @@ discusses…".
 A sixty-second clip does not become more informative by being summarised at
 length.
 
+Shorts are excluded by default and you will not normally see one; a feed reaching
+you with `kind: "short"` has asked for them with `"exclude_shorts": false`. If
+someone asks why a channel's Shorts never arrive, that key is the answer — check
+`feeds`, and `shorts_excluded` in the last `check`. Never treat their absence as
+the channel having gone quiet.
+
 **You have not watched anything.** You have read a caption track — often
 auto-generated, often wrong about tickers and numbers that sound alike. Where
 the transcript is garbled, say the transcript is unclear rather than guessing

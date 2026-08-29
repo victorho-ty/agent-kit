@@ -15,7 +15,7 @@ file as documentation.
 | `transcript_languages` | `en, en-US, en-GB, zh-Hant, zh-Hans, zh` | preferred caption languages, best first |
 | `transcript_grace_minutes` | `120` | how long a caption-less video is held before going out bare |
 | `max_transcript_attempts` | `3` | attempts per video before it is left alone |
-| `detect_shorts` | `true` | one extra request per new video to label short vs long |
+| `exclude_shorts` | `true` | drop Shorts at the door; the default for every feed |
 | `exclude` | none | drops a video outright, whatever else it says |
 
 There is deliberately **no schedule key**. The cron entry is the cadence;
@@ -30,6 +30,7 @@ cannot express is per-feed politeness, so that is the one knob provided below.
 | `url` | required | a real YouTube feed url (see below) |
 | `note` | none | what this channel covers, **in words the agent reads** |
 | `transcript` | `true` | `false` sends the title and the link only |
+| `exclude_shorts` | global | `false` keeps this channel's Shorts |
 | `min_interval_minutes` | `0` | a floor on how often this feed is fetched |
 | `max_items` | `15` | entries taken from one document |
 | `enabled` | `true` | `false` pauses a feed without losing its history |
@@ -73,15 +74,41 @@ description, the publication time and a thumbnail url. It does **not** carry:
 
 - **Duration.** Nothing in the feed says how long a video is.
 - **Whether it is a Short.** Shorts and long uploads arrive in the same feed,
-  indistinguishable. `detect_shorts` resolves this with one request per new
-  video: `/shorts/<id>` stays put for a Short and redirects to `/watch` for
-  anything else. If the request fails, `kind` is `unknown` — a video is never
-  lost over a label.
+  indistinguishable. One request per new video resolves it: `/shorts/<id>` stays
+  put for a Short and redirects to `/watch` for anything else.
 - **View count, likes, or anything else that changes after publication.** Which
   is a feature: nothing here needs re-reading a video it has already seen.
 
 Videos absorbed by a **cold start are never resolved**. Fifteen redirects to
 label a back catalogue nobody will be shown is fifteen wasted requests.
+
+## Shorts
+
+`exclude_shorts` is `true` by default, globally and therefore per feed. A Short
+that a feed excludes is **dropped at the door**: it costs one redirect, and then
+no row, no transcript fetch and no place in a ledger it would never leave. It is
+counted separately from the keyword filter, as `shorts_excluded` per feed and
+`videos_excluded_shorts` in the totals, because "this channel posts nothing but
+Shorts" and "this channel posts nothing" are different answers to the same
+question.
+
+Set `"exclude_shorts": false` on a feed whose Shorts are worth reading — some
+channels put a real rate call in sixty seconds, and most use the format as
+advertising. That is a per-channel judgement, which is why the key is per feed.
+
+Detection is not configurable. Every new video is resolved short-or-long, on
+every feed, because the answer costs one redirect and is worth knowing whether or
+not this feed filters on it — and a knob that could switch detection off would be
+a knob that silently disables a filter the operator asked for.
+
+One rule holds whatever the config says: **`unknown` is never excluded.** If the
+redirect fails, the video goes through. A video is never lost to a label that
+could not be resolved.
+
+The corollary of dropping at the door: flipping `exclude_shorts` to `false` later
+does not recover the Shorts already dropped — they were never stored. Ones still
+inside the feed's `max_items` window will be picked up on the next check and sent
+as if new. Same behaviour as un-excluding a keyword.
 
 ## Transcripts
 

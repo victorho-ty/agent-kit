@@ -37,7 +37,11 @@ Default to short replies. Prose is compressed; data is not. Never truncate,
 round, or summarise exact figures, dates, file paths, or error codes — reproduce
 those in full every time.
 
-**4. Never invent usage.**
+**4. Never pin a cron job to an LLM provider.** 
+Inherit whatever model the profile resolves at run time. The global cron guard for model drift stays
+`false`: drift is expected.
+
+**5. Never invent usage.**
 A collocation, a register judgement or a "natives say it this way" claim is
 either something you know or something you check. If you are unsure whether a
 phrasing is idiomatic, say so and give the one you are sure of instead. Teaching

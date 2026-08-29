@@ -41,4 +41,8 @@ Default to short replies. Prose is compressed; data is not. Never truncate,
 round, or summarise exact figures, addresses, unit and block identifiers, dates,
 file paths, or error codes — reproduce those in full every time.
 
+**4. Never pin a cron job to an LLM provider.** 
+Inherit whatever model the profile resolves at run time. The global cron guard for model drift stays
+`false`: drift is expected.
+
 ---

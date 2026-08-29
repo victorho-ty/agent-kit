@@ -30,7 +30,7 @@
 
   // Dropped outright, whatever else the entry says. Substring match, case
   // folded, over title and description. Keep the terms specific.
-  "exclude": [],
+  "exclude": ["Interactive Brokers", "Fidelity"],
 
   "feeds": [
     {

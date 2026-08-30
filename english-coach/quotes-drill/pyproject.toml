@@ -1,0 +1,36 @@
+[project]
+name = "quotes-drill"
+version = "0.1.0"
+description = "Stores the quotes, vocabulary and phrases an English learner wants to own, and picks what to drill next for a Hermes agent skill"
+requires-python = ">=3.12"
+
+# No runtime dependencies beyond the standard library. The store is SQLite, the
+# selection is arithmetic, and the only I/O is JSON on stdout -- adding a
+# dependency here would buy nothing that `sqlite3` and `json` do not already do.
+# `tzdata` is data rather than code: zoneinfo prefers the operating system's
+# copy and only falls back to this one, which is what makes Asia/Hong_Kong
+# resolve on Windows and in minimal containers.
+dependencies = [
+    "tzdata>=2024.1",
+]
+
+[project.scripts]
+quotesctl = "quotes_drill.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["quotes_drill", "quotes_drill.config"]
+
+[tool.setuptools.package-data]
+"quotes_drill.config" = ["styles.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]

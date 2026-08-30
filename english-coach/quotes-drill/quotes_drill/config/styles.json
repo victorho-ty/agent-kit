@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "note": "A style flavours wording the coach would vouch for. It never licenses an invented idiom.",
+  "default": [
+    {
+      "name": "educated native, spoken",
+      "voice": "how a well-read colleague actually talks: contractions, short clauses, no bookish words used for effect"
+    },
+    {
+      "name": "storyteller",
+      "voice": "one small concrete scene, past tense, the point landing in the last sentence"
+    }
+  ],
+  "categories": {
+    "Food": [
+      {
+        "name": "Mark Wiens",
+        "voice": "food vlogger: present tense, mid-bite reactions, sensory verbs, honest superlatives - 'the flavour is unbelievable', 'you get that smokiness right at the back'"
+      }
+    ],
+    "Inspiration": [
+      {
+        "name": "TED closing line",
+        "voice": "one idea, stated plainly, then turned outward to the listener; short sentence last"
+      },
+      {
+        "name": "Obama cadence",
+        "voice": "measured, pauses that carry weight, triples and repeated openings, 'not because it is easy, but because'"
+      },
+      {
+        "name": "Brene Brown",
+        "voice": "research language made personal: names the feeling, owns the discomfort, no polish over the hard part"
+      }
+    ],
+    "Computer": [
+      {
+        "name": "Steve Jobs keynote",
+        "voice": "short declaratives, one number that matters, a pause before the point - 'and it just works'"
+      },
+      {
+        "name": "explain-it-to-the-team",
+        "voice": "one analogy from ordinary life, then the mechanism in plain words, no jargon left undefined"
+      }
+    ],
+    "Sports": [
+      {
+        "name": "play-by-play",
+        "voice": "present tense, rising energy, verbs first, the name of the player before the action"
+      },
+      {
+        "name": "post-match interview",
+        "voice": "modest, first person plural, credit outward, cliches used the way players really use them"
+      }
+    ],
+    "Joke": [
+      {
+        "name": "stand-up beat",
+        "voice": "set-up in one breath, misdirection, punchline as the last three words - never explained afterwards"
+      },
+      {
+        "name": "dry British understatement",
+        "voice": "the disaster described as a mild inconvenience, delivered flat"
+      },
+      {
+        "name": "self-deprecating office humour",
+        "voice": "the speaker is the butt of it, small workplace detail, said in passing rather than performed"
+      }
+    ],
+    "Empathy": [
+      {
+        "name": "reflective listening",
+        "voice": "names back what was heard before adding anything, no advice unless asked, unhurried"
+      },
+      {
+        "name": "close friend",
+        "voice": "plain and warm, no therapy vocabulary, offers something specific rather than 'let me know if you need anything'"
+      },
+      {
+        "name": "condolence register",
+        "voice": "formal but not stiff, short sentences, says the thing directly instead of around it"
+      }
+    ],
+    "Greeting": [
+      {
+        "name": "warm host",
+        "voice": "uses the name, one specific question rather than 'how are you', makes room for the other person to answer"
+      },
+      {
+        "name": "casual local",
+        "voice": "reduced forms and idiom the way people greet each other in the street, not the phrasebook version"
+      }
+    ]
+  }
+}

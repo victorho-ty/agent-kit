@@ -1,0 +1,44 @@
+[project]
+name = "hk-transaction-tracker"
+version = "0.1.0"
+description = "Centanet tracker for configured Hong Kong estates"
+requires-python = ">=3.12"
+
+# Deliberately *not* dependencies:
+#
+# * `requests` -- the fetch is one GET with three headers. `urllib` is fewer
+#   moving parts and keeps the whole test suite runnable without a network stub.
+# * `beautifulsoup4` / `lxml` -- there is nothing to select. The transaction
+#   list is server-rendered into a `window.__NUXT__` payload, so the visible
+#   table is built by Vue from data that is already in the response; CSS
+#   selectors against the served HTML match nothing at all.
+# * `playwright` / `selenium` -- for the same reason. A headless browser here
+#   would be paying Chromium to hand back data the first response contained.
+# * `pandas` -- the archive is one SQLite table queried with four filters, and
+#   the only statistic taken from it is a median. `sqlite3` and `statistics`
+#   cover it, and both are stdlib.
+dependencies = [
+    "matplotlib>=3.8",
+    "tzdata>=2024.1",
+]
+
+[project.scripts]
+hk-tx = "hk_transaction_tracker.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["hk_transaction_tracker", "hk_transaction_tracker.config"]
+
+[tool.setuptools.package-data]
+hk_transaction_tracker = ["config/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]

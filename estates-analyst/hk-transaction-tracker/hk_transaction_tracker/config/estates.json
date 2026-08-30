@@ -1,0 +1,65 @@
+// What the tracker watches. Whole-line // comments are stripped before parsing,
+// so the notes and the disabled example below can stay in the file.
+//
+// Field reference: skills/hk-transaction-tracker/references/config.md
+//
+// After any edit, run `hk-tx estates` -- it validates the file and prints each
+// entry's criteria and health. A malformed file is ERR_CONFIG, not a crash.
+//
+// The `name` is the archive's key. Renaming an entry orphans everything already
+// collected under the old name, so change `label` for display and leave `name`.
+{
+  "timezone": "Asia/Hong_Kong",
+
+  // Seconds between estates. These are somebody else's servers and the whole
+  // run is three requests; there is nothing to gain by hurrying it.
+  "request_delay_seconds": 2.0,
+
+  // Records asked for per estate. 100 is Centanet's hard ceiling: 101 returns
+  // an empty list rather than an error. Do not raise it.
+  "fetch_size": 100,
+
+  "trend": {
+    // The last N days against the N before them, on 呎價(實) medians.
+    "window_days": 90,
+    // Below this many transactions in a window there is no trend to report.
+    "min_samples": 3,
+    // Months of monthly medians behind a line chart, and the fewest months
+    // carrying data before one is worth drawing.
+    "chart_months": 24,
+    "chart_min_points": 3
+  },
+
+  "estates": [
+    {
+      "name": "TheMerton",
+      "label": "泓都",
+      "url": "https://hk.centanet.com/findproperty/list/transaction/%E6%B3%93%E9%83%BD_2-SSPPWPPYPS?q=8prsheylr1o5h",
+      "bedrooms": [1, 3],
+      "size_ranges": [[300, 330], [600, 700]],
+      "track": ["sale", "rental"],
+      "enabled": true
+    },
+    {
+      "name": "BlueCoast-2",
+      "label": "BlueCoast-2",
+      "url": "https://hk.centanet.com/findproperty/list/transaction/%E6%B8%AF%E5%B3%B6%E5%8D%97%E5%B2%B8-3C%E6%9C%9F-Blue-Coast-II_2-SDPPWPPJKB@P",
+      "bedrooms": [1, 2],
+      "size_ranges": [[300, 550]],
+      "track": ["sale", "rental"],
+      "enabled": true
+    },
+    {
+      "name": "海盈山",
+      "label": "海盈山",
+      "url": "https://hk.centanet.com/findproperty/list/transaction/%E6%B8%AF%E5%B3%B6%E5%8D%97%E5%B2%B8-4A%E6%9C%9F-%E6%B5%B7%E7%9B%88%E5%B1%B1_2-SDPPWPPJEB@P",
+      "bedrooms": [1, 2],
+      "size_ranges": [[300, 550]],
+      "track": ["sale", "rental"],
+      "enabled": true
+    }
+    // A fuller example. `bedrooms: [0]` is 開放式 and `[4]` is 4房或以上.
+    // An omitted or empty list means no constraint on that dimension, so an
+    // entry with neither reports every transaction in the estate.
+  ]
+}

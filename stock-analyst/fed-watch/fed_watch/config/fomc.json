@@ -1,0 +1,17 @@
+{
+  "_comment": "FOMC rate-decision dates -- the SECOND day of each two-day meeting, which is when the target range is announced and from which the new rate is effective the following day. Transcribed from the CME FedWatch meeting tabs on 2026-09-12. The Fed publishes about a year ahead, so this file expires: `fedctl meetings` warns when fewer than three dates remain ahead of today.",
+  "_source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+  "updated": "2026-09-12",
+  "meetings": [
+    "2026-09-16",
+    "2026-10-28",
+    "2026-12-09",
+    "2027-01-27",
+    "2027-03-17",
+    "2027-04-28",
+    "2027-06-09",
+    "2027-07-20",
+    "2027-09-15",
+    "2027-10-27"
+  ]
+}

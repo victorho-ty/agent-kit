@@ -1,0 +1,52 @@
+[project]
+name = "fed-watch"
+version = "0.1.0"
+description = "FOMC target-rate probabilities derived from 30-Day Fed Funds futures, with a snapshot history and change detection, for the Hermes stock-analyst profile"
+requires-python = ">=3.12"
+
+# Three runtime dependencies, each earning its place:
+#
+# * `yfinance` is the only free source of *dated* 30-Day Fed Funds futures that
+#   was reachable without a key. The symbol form matters and is not obvious:
+#   `ZQU26.CBT` resolves, while `ZQU26=F` and `ZQU26` both 404, and the bare
+#   `ZQ=F` is front-month continuous -- useless here, because a second meeting
+#   in a later month needs that later month's contract by name.
+# * `matplotlib` draws the probability history. Nothing else here needs a plot,
+#   and mplfinance (which the sibling stock-desk bundle uses) would be a candle
+#   renderer we never call.
+# * `tzdata` is data, not code: zoneinfo prefers the operating system's copy and
+#   only falls back to this one, which is what makes Asia/Hong_Kong resolve on
+#   Windows and in minimal containers.
+#
+# The effective fed funds rate and the current target range come from the New
+# York Fed's public API over plain `urllib` -- no key, no dependency.
+#
+# The probability maths in `probabilities.py` depends on none of these. It is
+# pure stdlib over floats, so the whole test suite runs without a network and
+# without a market being open.
+dependencies = [
+    "yfinance>=0.2.40",
+    "matplotlib>=3.8",
+    "tzdata>=2024.1",
+]
+
+[project.scripts]
+fedctl = "fed_watch.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["fed_watch", "fed_watch.config"]
+
+[tool.setuptools.package-data]
+"fed_watch.config" = ["fomc.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]

@@ -54,12 +54,21 @@
       "label": "海盈山",
       "url": "https://hk.centanet.com/findproperty/list/transaction/%E6%B8%AF%E5%B3%B6%E5%8D%97%E5%B2%B8-4A%E6%9C%9F-%E6%B5%B7%E7%9B%88%E5%B1%B1_2-SDPPWPPJEB@P",
       "bedrooms": [1, 2],
-      "size_ranges": [[300, 550]],
+      "size_ranges": [[300, 580]],
+      "track": ["sale", "rental"],
+      "enabled": true
+    },
+    {
+      "name": "CaymanRise",
+      "label": "CaymanRise",
+      "url": "https://hk.centanet.com/findproperty/list/transaction/%E5%8A%A0%E6%83%A0%E8%87%BA_2-SSPPWPPEPS",
+      "bedrooms": [3],
+      "size_ranges": [[600, 700]],
       "track": ["sale", "rental"],
       "enabled": true
     }
     // A fuller example. `bedrooms: [0]` is 開放式 and `[4]` is 4房或以上.
-    // An omitted or empty list means no constraint on that dimension, so an
-    // entry with neither reports every transaction in the estate.
+    // bedrooms|size_ranges lists are independent dimensions with no length relationship.
+    // An omitted or empty list means no constraint, so an entry with neither reports every transaction in the estate.
   ]
 }

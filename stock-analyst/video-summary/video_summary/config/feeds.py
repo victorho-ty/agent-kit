@@ -31,6 +31,9 @@ from ..errors import ConfigError
 
 CONFIG_FILE = Path(__file__).parent / "feeds.json"
 
+# Seconds between requests within one check. Conditional GET already makes a
+# check of an unchanged feed nearly free; this is what keeps a burst of ten
+# channels from arriving as ten simultaneous requests.
 DEFAULT_DELAY_SECONDS = 2.0
 DEFAULT_MAX_ITEMS = 15
 # How many videos one `check` will hand over at once. A backlog is drained a

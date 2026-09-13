@@ -22,11 +22,7 @@ DEFAULT_DB_PATH = DEFAULT_STATE_DIR / "video_summary.db"
 DEFAULT_TRANSCRIPT_DIR = DEFAULT_STATE_DIR / "transcripts"
 DEFAULT_TZ = "Asia/Hong_Kong"
 DEFAULT_TIMEOUT = 20.0
-DEFAULT_RETRIES = 2
-# Seconds between requests within one check. Conditional GET already makes a
-# check of an unchanged feed nearly free; this is what keeps a burst of ten
-# channels from arriving as ten simultaneous requests.
-DEFAULT_DELAY_SECONDS = 2.0
+DEFAULT_RETRIES = 5
 
 
 def db_path() -> Path:
@@ -56,12 +52,6 @@ def http_timeout() -> float:
 
 def http_retries() -> int:
     return int(os.environ.get("VIDEO_SUMMARY_RETRIES", DEFAULT_RETRIES))
-
-
-def request_delay() -> float | None:
-    """Per-request pacing override; ``None`` means "use the value in feeds.json"."""
-    raw = os.environ.get("VIDEO_SUMMARY_DELAY")
-    return float(raw) if raw is not None else None
 
 
 def proxy_url() -> str | None:

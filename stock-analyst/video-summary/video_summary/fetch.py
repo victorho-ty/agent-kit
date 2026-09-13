@@ -1,6 +1,7 @@
 # Adapted from news-radar/news_radar/fetch.py (2026-08-23).
-# `head` is new; everything else is identical apart from USER_AGENT.
-# Keep fixes in sync by hand.
+# `head` is new; so is the retry policy below (news-radar still fails fast on
+# a 4xx, and its feeds have not given us a reason to change that). Otherwise
+# identical apart from USER_AGENT. Keep fixes in sync by hand.
 """Getting a document, politely.
 
 Plain ``urllib`` -- these are ordinary public documents and an HTTP stack would
@@ -14,15 +15,24 @@ channel that posts twice a week answers ``304 Not Modified`` to the other eighty
 two-hourly checks, which costs YouTube a few hundred bytes and costs us no
 parsing at all.
 
-**A 4xx is not retried.** It means the url is wrong, and hammering it will not
-make it right; it is a config error wearing a network error's clothes. A deleted
-channel is exactly this, and it should show up as a feed failure the operator
-can read, not as a slow retry loop.
+**Every HTTP error is retried, 404 included.** This used to be the opposite --
+a 4xx was treated as a config error wearing a network error's clothes and failed
+on the spot. YouTube disproved it: ``/feeds/videos.xml?channel_id=...`` answers
+404 for channels that plainly exist, in bursts, and the same url a few seconds
+later returns the feed. A url that is genuinely wrong still fails, just one
+backoff ladder later, and it still arrives as a readable feed failure carrying
+the last status. Paying ~30 seconds on a dead channel is the cheaper mistake
+than dropping a live one's videos.
+
+The ladder is exponential with jitter, and a ``Retry-After`` on a 429 or 503 is
+honoured over it -- when the server says how long to wait, arguing is rude.
 """
 
 from __future__ import annotations
 
 import dataclasses
+import email.utils
+import random
 import time as _time
 import urllib.error
 import urllib.request
@@ -31,6 +41,11 @@ from . import settings
 from .errors import FetchError
 
 USER_AGENT = "hermes-video-summary/0.1 (+personal video digest; two-hourly, conditional GET)"
+
+# The backoff ladder: 1s, 2s, 4s ... capped, plus up to 25% jitter so ten feeds
+# that all tripped over the same hiccup do not retry in lockstep.
+BACKOFF_BASE = 1.0
+BACKOFF_CAP = 30.0
 
 
 @dataclasses.dataclass(frozen=True)
@@ -73,6 +88,35 @@ def _request(url: str, *, etag: str | None, last_modified: str | None, method: s
     return urllib.request.Request(url, headers=headers, method=method)
 
 
+def _backoff(attempt: int) -> float:
+    """Seconds to wait after a failed ``attempt`` (0-based), with jitter."""
+    delay = min(BACKOFF_CAP, BACKOFF_BASE * (2 ** attempt))
+    return delay + random.uniform(0.0, delay * 0.25)
+
+
+def _retry_after(exc: urllib.error.HTTPError) -> float | None:
+    """The server's own answer to "how long?", in seconds, or ``None``.
+
+    Accepts both spellings -- a bare number of seconds and an HTTP date -- and
+    is clamped to ``BACKOFF_CAP``, so a server asking for an hour cannot park a
+    two-hourly check for one.
+    """
+    raw = ((exc.headers.get("Retry-After") if exc.headers else None) or "").strip()
+    if not raw:
+        return None
+    try:
+        seconds = float(raw)
+    except ValueError:
+        try:
+            parsed = email.utils.parsedate_to_datetime(raw)
+        except (TypeError, ValueError):
+            return None
+        if parsed is None:
+            return None
+        seconds = parsed.timestamp() - _time.time()
+    return max(0.0, min(BACKOFF_CAP, seconds))
+
+
 def get(
     url: str,
     *,
@@ -87,7 +131,9 @@ def get(
     request = _request(url, etag=etag, last_modified=last_modified, method="GET")
 
     last_error: Exception | None = None
+    last_status: int | None = None
     for attempt in range(attempts):
+        wait: float | None = None
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 raw = response.read()
@@ -101,17 +147,19 @@ def get(
         except urllib.error.HTTPError as exc:
             if exc.code == 304:
                 return Response(url=url, status=304, etag=etag, last_modified=last_modified)
-            last_error = exc
-            if exc.code < 500:
-                raise FetchError(
-                    f"GET {url} -> HTTP {exc.code} {exc.reason}", url=url, status=exc.code
-                ) from exc
+            last_error, last_status = exc, exc.code
+            wait = _retry_after(exc)
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            last_error = exc
+            last_error, last_status = exc, None
         if attempt + 1 < attempts:
-            _time.sleep(1.0 * (attempt + 1))
+            _time.sleep(_backoff(attempt) if wait is None else wait)
 
-    raise FetchError(f"GET {url} failed after {attempts} attempt(s): {last_error}", url=url)
+    detail = f"HTTP {last_status}" if last_status is not None else str(last_error)
+    raise FetchError(
+        f"GET {url} -> {detail}, failed after {attempts} attempt(s)",
+        url=url,
+        status=last_status,
+    )
 
 
 def resolved_url(url: str, *, timeout: float | None = None) -> str | None:

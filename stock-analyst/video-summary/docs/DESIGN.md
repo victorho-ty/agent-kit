@@ -192,9 +192,15 @@ with.
 ## 9. Failure isolation, copied wholesale
 
 Per-feed try/except, `feed_failures` in the payload, run status `partial`, the
-`recent_yield` zero-yield guard, conditional GET, no retry on 4xx, and the
-request delay are all from `news-radar` and unchanged. They earn their place for
-the same reasons documented there.
+`recent_yield` zero-yield guard, conditional GET, and the request delay are all
+from `news-radar` and unchanged. They earn their place for the same reasons
+documented there.
+
+The retry ladder is the one that diverged. `news-radar` fails fast on a 4xx;
+here every HTTP error is retried, 404 included, five times by default with
+exponential backoff, because YouTube's feed endpoint answers 404 in bursts for
+channels that exist. A dead channel now costs a backoff ladder before it is
+reported, which is the cheaper of the two mistakes.
 
 The one addition is that **a transcript failure is never a feed failure**. A
 video with no captions is real, new, and worth a line. Only an explicit

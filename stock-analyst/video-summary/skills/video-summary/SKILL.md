@@ -37,7 +37,7 @@ Environment overrides: `VIDEO_SUMMARY_DB` (default
 `~/.local/share/hermes-video-summary/video_summary.db`),
 `VIDEO_SUMMARY_TRANSCRIPTS`, `VIDEO_SUMMARY_CONFIG`, `VIDEO_SUMMARY_TZ` (default
 `Asia/Hong_Kong`, and `feeds.json` may override it), `VIDEO_SUMMARY_TIMEOUT`,
-`VIDEO_SUMMARY_RETRIES`, `VIDEO_SUMMARY_DELAY`, `VIDEO_SUMMARY_PROXY`.
+`VIDEO_SUMMARY_RETRIES`, `VIDEO_SUMMARY_PROXY`.
 
 ## One cron entry
 

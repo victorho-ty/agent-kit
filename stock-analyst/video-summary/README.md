@@ -84,8 +84,7 @@ someone wants their phone to buzz.
 | `VIDEO_SUMMARY_CONFIG` | `video_summary/config/feeds.json` in the bundle |
 | `VIDEO_SUMMARY_TZ` | `Asia/Hong_Kong` (a `timezone` key in the config wins) |
 | `VIDEO_SUMMARY_TIMEOUT` | `20` seconds per request |
-| `VIDEO_SUMMARY_RETRIES` | `2` |
-| `VIDEO_SUMMARY_DELAY` | overrides `request_delay_seconds` from the config |
+| `VIDEO_SUMMARY_RETRIES` | `5` (retries every HTTP error, 404 included, backing off 1s, 2s, 4s … capped at 30s) |
 | `VIDEO_SUMMARY_PROXY` | unset; a proxy for caption fetching only — see below |
 
 What is watched lives in `video_summary/config/feeds.json`. Whole-line `//`

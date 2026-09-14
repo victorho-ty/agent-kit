@@ -109,6 +109,21 @@ bundle, because state is scoped to the profile rather than the bundle. Charts
 deliberately do **not** share `stock-desk`'s directory: that bundle sweeps every
 PNG in its own chart directory on a retention timer and would delete these.
 
+## The chart is fitted, which costs something
+
+The y axis tracks the data's own range rather than 0-100, because a band sitting
+between 85% and 89% for a week is an unreadable flat line at full scale. The
+tick step is chosen from a ladder to keep four to seven gridlines at any span,
+and the axis is clamped to 0-100 so it never draws headroom a probability cannot
+have.
+
+The cost is that two charts are no longer comparable by eye, and a dramatic
+slope can be half a point of movement. That is why every line carries its latest
+value as text, and why the SKILL forbids reading a magnitude off the shape.
+
+No-change is not drawn at all: the bands sum to 1, so it is the one line that
+can always be derived from the others.
+
 ## What is deliberately absent
 
 - **No conditional tree beyond a uniform second-meeting increment.** Immaterial

@@ -89,10 +89,7 @@ def cmd_check_changes(args) -> int:
             "taken_at": taken,
             "fetched": not args.no_fetch,
             "price_source": current["price_source"],
-            "attribution": (
-                "computed from 30-Day Fed Funds futures using CME FedWatch's published "
-                "methodology; these are not CME's published figures"
-            ),
+            "attribution": snapshot.ATTRIBUTION,
             "policy": {
                 "effr": current["effr"],
                 "as_of": current["effr_as_of"],
@@ -134,10 +131,7 @@ def cmd_history(args) -> int:
             "from": history[0]["taken_at"],
             "to": latest["taken_at"],
             "price_source": latest["price_source"],
-            "attribution": (
-                "computed from 30-Day Fed Funds futures using CME FedWatch's published "
-                "methodology; these are not CME's published figures"
-            ),
+            "attribution": snapshot.ATTRIBUTION,
             "policy": {
                 "effr": latest["effr"],
                 "as_of": latest["effr_as_of"],

@@ -21,6 +21,9 @@ from .models import MeetingProbabilities
 
 MEETINGS_TRACKED = 2
 
+# Kept short on purpose: it rides on every payload and the delivery surface is a phone.
+ATTRIBUTION = "Computed from 30d FedFund futures using CME methodology"
+
 
 def take(conn, *, now: datetime | None = None, meetings_tracked: int = MEETINGS_TRACKED) -> dict:
     """Fetch, compute and store one snapshot. Returns the payload."""
@@ -76,10 +79,7 @@ def render(
         "taken_at": taken_at.isoformat(),
         "status": status,
         "price_source": price_source,
-        "attribution": (
-            "computed from 30-Day Fed Funds futures using CME FedWatch's published "
-            "methodology; these are not CME's published figures"
-        ),
+        "attribution": ATTRIBUTION,
         "policy": {
             "effr": policy.effr,
             "as_of": policy.as_of.isoformat(),
@@ -92,13 +92,7 @@ def render(
 
 
 def meeting_payload(meeting: MeetingProbabilities) -> dict:
-    # A clear following month is read directly, so nothing is amplified.
-    factor = (
-        probabilities.amplification(meeting.meeting_date)
-        if meeting.method == "blend_inversion"
-        else 1.0
-    )
-    return {
+    payload = {
         "meeting_date": meeting.meeting_date.isoformat(),
         "ordinal": meeting.ordinal,
         "contract": meeting.contract,
@@ -106,11 +100,6 @@ def meeting_payload(meeting: MeetingProbabilities) -> dict:
         "implied_rate": meeting.implied_rate,
         "expected_rate": meeting.expected_rate,
         "method": meeting.method,
-        "amplification": round(factor, 2),
-        # Decided here rather than left to the agent to work out from the
-        # factor: whether a reading is too noisy to quote plainly is a
-        # threshold, and thresholds belong in code.
-        "noisy": factor > probabilities.AMPLIFICATION_WARNING,
         "outcomes": [
             {
                 "step": outcome.step,
@@ -122,16 +111,12 @@ def meeting_payload(meeting: MeetingProbabilities) -> dict:
             for outcome in meeting.outcomes
         ],
     }
+    return _with_amplification(payload, meeting.meeting_date, meeting.method)
 
 
 def stored_meeting_payload(meeting: dict) -> dict:
     """The same shape, rebuilt from a stored row."""
-    factor = (
-        probabilities.amplification(date.fromisoformat(meeting["meeting_date"]))
-        if meeting["method"] == "blend_inversion"
-        else 1.0
-    )
-    return {
+    payload = {
         "meeting_date": meeting["meeting_date"],
         "ordinal": meeting["ordinal"],
         "contract": meeting["contract"],
@@ -139,8 +124,6 @@ def stored_meeting_payload(meeting: dict) -> dict:
         "implied_rate": meeting["implied_rate"],
         "expected_rate": meeting["expected_rate"],
         "method": meeting["method"],
-        "amplification": round(factor, 2),
-        "noisy": factor > probabilities.AMPLIFICATION_WARNING,
         "outcomes": [
             {
                 "step": outcome["step"],
@@ -152,6 +135,27 @@ def stored_meeting_payload(meeting: dict) -> dict:
             for outcome in meeting["outcomes"]
         ],
     }
+    return _with_amplification(
+        payload, date.fromisoformat(meeting["meeting_date"]), meeting["method"]
+    )
+
+
+def _with_amplification(payload: dict, meeting_date: date, method: str) -> dict:
+    """Attach the noise diagnostics, and ``noisy`` only when it is true.
+
+    A clear following month is read directly, so nothing is amplified.
+
+    ``noisy: false`` is deliberately absent rather than present-and-false. It
+    tells the reader nothing, and a field that is there invites the agent to
+    narrate the all-clear -- which is exactly how "Both readings clean: no noisy
+    flag" reached a Telegram message. A field that is not in the payload cannot
+    be reported.
+    """
+    factor = probabilities.amplification(meeting_date) if method == "blend_inversion" else 1.0
+    payload["amplification"] = round(factor, 2)
+    if factor > probabilities.AMPLIFICATION_WARNING:
+        payload["noisy"] = True
+    return payload
 
 
 def _label(step: int) -> str:

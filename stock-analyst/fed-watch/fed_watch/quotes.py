@@ -30,8 +30,8 @@ from datetime import datetime
 from .errors import FetchError
 from .models import Quote
 
-INTRADAY_SOURCE = "yfinance 1m last trade (not CME settlement mid)"
-DAILY_SOURCE = "yfinance daily close (not CME settlement mid)"
+INTRADAY_SOURCE = "yfinance 1m last trade (not CME mid)"
+DAILY_SOURCE = "yfinance daily close (not CME mid)"
 
 
 def _latest(frame) -> tuple[float, datetime | None] | None:

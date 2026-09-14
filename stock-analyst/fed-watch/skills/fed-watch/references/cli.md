@@ -51,7 +51,6 @@ Read the market now and store one row of history. Wakes nobody.
       "expected_rate": 3.849639,
       "method": "blend_inversion",
       "amplification": 2.14,
-      "noisy": false,
       "outcomes": [
         {"step": 0, "basis_points": 0, "label": "no change", "band": "3.50-3.75%", "probability_pct": 12.1},
         {"step": 1, "basis_points": 25, "label": "25bp hike", "band": "3.75-4.00%", "probability_pct": 87.9}
@@ -68,6 +67,11 @@ remain ahead of today.
 
 `outcomes` is contiguous across `step` and always contains `step: 0`. A band at
 `0.0` was priced at nothing.
+
+`noisy` appears **only when it is true** — that is, when `blend_inversion`
+divides by few enough remaining days that `amplification` is large. Its
+absence is the normal case and means nothing needs saying; there is no
+`noisy: false`.
 
 `price_source` is the Yahoo series the prices actually came from. Normally the
 one-minute series; when that is empty for a contract it falls back to the daily
@@ -159,7 +163,7 @@ The last N reported changes, summarised and charted. Fetches nothing.
       "meeting_date": "2026-09-16",
       "orientation": "portrait",
       "points": 5,
-      "series": ["no change", "25bp hike", "50bp hike"],
+      "series": ["25bp hike", "50bp hike"],
       "from": "2026-09-12T09:00:00+00:00",
       "to": "2026-09-12T13:00:00+00:00"
     }
@@ -170,6 +174,11 @@ The last N reported changes, summarised and charted. Fetches nothing.
 
 `net_change` spans the whole window at a zero threshold, so it shows every band
 that moved at all — not the same as the most recent reported change.
+
+`series` lists the bands actually drawn. No-change is never among them: the
+bands sum to 1, so it is derivable and is left off the chart. A meeting whose
+only ever outcome was no-change has nothing to draw and lands in
+`charts_skipped` instead.
 
 `ERR_INSUFFICIENT` means no changes have been reported yet. `detail` carries
 `stored_snapshots` so a run of `snap`s with nothing reported is distinguishable

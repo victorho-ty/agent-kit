@@ -106,19 +106,23 @@ always including `no change`. A band at `0.0` was priced at nothing; that is a
 finding, not a gap. `label` is finished text (`25bp hike`, `no change`,
 `50bp cut`) — use it rather than deriving the wording from `step`.
 
-`method` says how the post-meeting rate was recovered, and it bears on how much
-weight the number carries:
+### The diagnostics are for you, not for the reader
+
+`method`, `amplification` and `noisy` decide how much weight a number carries.
+They are **never themselves worth reporting.**
 
 | method | meaning |
 |---|---|
 | `clean_next_month` | read straight off a contract for a month with no meeting in it — no inversion, nothing amplified |
-| `blend_inversion` | solved out of the meeting month's own contract |
+| `blend_inversion` | solved out of the meeting month's own contract, which multiplies any price error by `amplification` |
 
-`amplification` is how much a `blend_inversion` multiplies any error in the
-price, and `noisy: true` is the bundle's verdict on whether that is too much.
-**When `noisy` is true, say the reading is rough** rather than quoting it flat;
-the calculation is dividing by a small number of remaining days. Do not compare
-`amplification` against a threshold yourself -- `noisy` already has.
+`noisy` appears **only when it is true**, and it is the bundle's verdict, not
+yours — never compare `amplification` against a threshold yourself.
+
+- `noisy` **absent** — the normal case. Say nothing whatsoever about it.
+- `noisy: true` — add one clause saying that reading is rough, then carry on.
+
+This is the only route by which any of the three reaches a message.
 
 `status: "partial"` means only some meetings priced. The ones present are good;
 the missing ones are named in `failures`. Never fill a gap from an earlier run.
@@ -126,14 +130,22 @@ the missing ones are named in `failures`. Never fill a gap from an earlier run.
 ## Charts
 
 `charts` is a list of file paths, one per meeting, plotting each band's
-probability across the reported changes.
+probability across the reported changes. **Only moves are drawn** -- there is
+no no-change line, because it is 1 minus the moves. Each line carries its
+latest value as a printed percentage. `series` lists exactly what was drawn.
+
+**The y axis is fitted to the data, not fixed at 0-100**, and the tick step
+changes with it. Two charts are therefore not comparable by eye, and a steep
+line may be a move of half a point. Never read a magnitude off the shape --
+`changes` and `latest` carry the numbers.
 
 **A chart is a file path to you, not an image.** Never describe a line, a slope
 or a trend from one. Everything you say about the movement comes from `changes`
 and `latest` in the same payload.
 
-`charts_skipped` names meetings with fewer than two reported changes — there is
-no line to draw yet. That is normal on a new install and is not an error.
+`charts_skipped` names meetings with nothing to draw — fewer than two reported
+changes, or a market that has only ever priced no-change. Both are normal and
+neither is an error; `reason` says which.
 
 Charts are rendered portrait for a phone. `FED_WATCH_CHART_ORIENTATION=landscape`
 is the override; do not use it unless the operator says they are at a desk.
@@ -175,6 +187,8 @@ has not started trading. `fedctl meetings` shows which contract each date needs.
 - Never state or imply that the Fed will do something. The market pricing it at
   99% is still the market's opinion.
 - When `quiet: true`, say nothing at all.
+- **Never narrate a diagnostic field.** `method`, `amplification`, `noisy`,
+  explain the number to you, not to the reader. Reporting that nothing is wrong with them is noise.
 - Never run a poll to make something appear, and never loop one. Nothing moved
   is the normal answer.
 - Do not re-report a change from memory. Everything unreported is in the

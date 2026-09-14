@@ -32,8 +32,8 @@ Read the market now and store one row of history. Wakes nobody.
   "snapshot_id": 1,
   "taken_at": "2026-09-12T00:46:57+08:00",
   "status": "ok",
-  "price_source": "yfinance 1m last trade (not CME settlement mid)",
-  "attribution": "computed from 30-Day Fed Funds futures using CME FedWatch's published methodology; these are not CME's published figures",
+  "price_source": "yfinance 1m last trade (not CME mid)",
+  "attribution": "Computed from 30d FedFund futures using CME methodology",
   "policy": {
     "effr": 3.63,
     "as_of": "2026-09-10",

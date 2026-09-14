@@ -33,9 +33,8 @@ Every command prints one JSON object on stdout. Parse it. The one exception is
 
 ## These are not CME's numbers, and you must say so
 
-The figures are **computed from 30-Day Fed Funds futures using CME's published
-methodology** — they are not scraped from the CME FedWatch page. Against CME's
-own table the method is exact; the residual gap of roughly **one percentage
+The figures are **computed from 30d FedFund futures using CME's
+methodology**. Against CME's own table the method is exact; the residual gap of roughly **one percentage
 point** comes from the price source, because Yahoo serves a traded print and CME
 publishes a settlement mid. `price_source` says which Yahoo series was used.
 

@@ -84,7 +84,7 @@ hidden.
 Snap, then report what moved since the last snapshot that was *reported*.
 
 ```
---threshold P    percentage points a probability must move to count (default 1.0)
+--threshold P    percentage points a probability must move to count (default 4.0)
 --limit N        how many reported changes the charts cover (default 10)
 --meetings N     how many upcoming meetings to price (default 2)
 --no-fetch       diff the stored history without fetching; for replay and outages
@@ -98,7 +98,7 @@ Adds to the snapshot shape:
   "fetched": true,
   "changes": {
     "changed": true,
-    "threshold_pct": 1.0,
+    "threshold_pct": 4.0,
     "baseline_taken_at": "2026-09-12T09:00:00+08:00",
     "largest_move_pct": 4.7,
     "policy_changed": false,
@@ -213,7 +213,7 @@ The calendar, and which contract answers each date. Fetches nothing.
 | `FED_WATCH_CHART_DIR` | `~/.local/share/hermes-stock-analyst/fedwatch-charts` |
 | `FED_WATCH_CHART_ORIENTATION` | `portrait` |
 | `FED_WATCH_CHART_RETENTION` | `7` (days) |
-| `FED_WATCH_CHANGE_THRESHOLD` | `1.0` (percentage points) |
+| `FED_WATCH_CHANGE_THRESHOLD` | `4.0` (percentage points) |
 | `FED_WATCH_CALENDAR` | the shipped `fed_watch/config/fomc.json` |
 | `FED_WATCH_TZ` | `Asia/Hong_Kong` |
 | `FED_WATCH_TIMEOUT` | `20.0` (seconds) |

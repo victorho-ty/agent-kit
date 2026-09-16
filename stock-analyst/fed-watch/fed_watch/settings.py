@@ -27,11 +27,11 @@ DEFAULT_TIMEOUT = 20.0
 DEFAULT_RETRIES = 2
 DEFAULT_CHART_RETENTION_DAYS = 7
 DEFAULT_CHART_ORIENTATION = "portrait"
-# Percentage points. Below this, a difference is the futures price breathing --
-# ZQ trades continuously and a probability recomputed a minute later is never
-# byte-identical. See changes.py for why the baseline does not move until
-# something is actually reported.
-DEFAULT_CHANGE_THRESHOLD = 1.0
+# Percentage points a probability must move before anybody is told. This is the
+# alerting gate: below it, `check-changes` stays quiet and wakes nothing.
+# See changes.py for why the baseline does not move until something is actually
+# reported -- that is what stops a slow drift hiding under this gate forever.
+DEFAULT_CHANGE_THRESHOLD = 4.0
 # How many changes a chart shows when the caller does not say.
 DEFAULT_CHANGE_WINDOW = 10
 

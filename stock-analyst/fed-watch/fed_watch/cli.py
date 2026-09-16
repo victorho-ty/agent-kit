@@ -216,7 +216,7 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument(
         "--threshold",
         type=float,
-        help="percentage points a probability must move to count (default 1.0)",
+        help="percentage points a probability must move to count (default 4.0)",
     )
     check.add_argument(
         "--limit",

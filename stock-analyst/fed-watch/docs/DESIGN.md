@@ -82,9 +82,8 @@ one afternoon it matters most.
 ### The change baseline is the last *report*, not the last poll
 
 ZQ trades continuously, so consecutive polls always differ slightly. Comparing
-poll to poll, a drift of a third of a point an hour never clears a
-one-point threshold and is never reported, while the probability quietly walks
-ten points across a day.
+poll to poll, a drift of a very small point an hour never clears the defined threshold 
+and is never reported, while the probability quietly walks ten points across a day.
 
 `snapshots.reported_at` is stamped only when `check-changes` actually reports
 something. A quiet poll leaves the baseline where it was, so drift accumulates

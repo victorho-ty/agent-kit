@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from fed_watch import changes
+from fed_watch import changes, settings
 
 
 def snapshot(taken_at: str, hike_pct: float, no_change_pct: float, effr: float = 3.63) -> dict:
@@ -104,3 +104,16 @@ def test_series_backfills_a_band_that_was_not_priced_earlier():
     )
     shaped = changes.series([first, second])
     assert shaped["2026-09-16"]["series"]["50bp hike"] == [0.0, 35.0]
+
+
+def test_a_move_under_four_points_no_longer_alerts():
+    """86.7 -> 89.9 is 3.2 points: real, but below the gate."""
+    before = snapshot("2026-09-12T09:00:00+08:00", 86.7, 13.3)
+    after = snapshot("2026-09-12T15:00:00+08:00", 89.9, 10.1)
+    assert changes.diff(before, after, settings.change_threshold())["changed"] is False
+
+
+def test_a_move_over_four_points_alerts():
+    before = snapshot("2026-09-12T09:00:00+08:00", 86.7, 13.3)
+    after = snapshot("2026-09-12T15:00:00+08:00", 91.4, 8.6)
+    assert changes.diff(before, after, settings.change_threshold())["changed"] is True

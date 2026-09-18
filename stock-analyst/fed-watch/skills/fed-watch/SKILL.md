@@ -93,13 +93,36 @@ that everything moved. Say so plainly or say nothing.
 the target range itself changed between the baseline and now. That is the real
 event and it outranks every probability on the page. Lead with it.
 
-A meeting marked `dropped` has passed or rolled off the tracked window; `new`
-means it entered it. Neither is a change in the odds and neither should be
-reported as one.
+A meeting marked `dropped` has rolled off the tracked window; `new` means it
+entered it. Neither is a change in the odds and neither should be reported as
+one. A meeting that has simply *happened* does not appear here at all -- see
+below.
+
+## Decided meetings are gone, everywhere
+
+**Every meeting in every payload is still ahead.** Storage drops a meeting on
+the day after its decision and deletes its stored readings, so a date that has
+already been announced cannot reach `latest`, `current`, `changes` or `charts`
+— not from a stale snapshot, not from an old chart, not from a window of
+reported changes that spans the announcement.
+
+The boundary is the Hong Kong date: a meeting is kept through its own decision
+day, because the announcement lands in the afternoon and until then the futures
+are still pricing it. From the next day it is gone.
+
+So a decided meeting is never something to explain, caveat or mention. If you
+want to say what the Fed actually did, that is `policy_changed` and the target
+range, not a leftover probability.
+
+`purged` appears on `snap` and `check-changes` when readings were deleted. It
+is a housekeeping counter for whoever is debugging the store. **Never report
+it** — nobody asked how tidy the database is.
 
 ## Reading a snapshot
 
 `meetings` is ordered — `ordinal` 1 is the next decision, 2 the one after it.
+Ordinals are renumbered when a meeting drops out, so this holds even for a
+snapshot stored before the last decision.
 
 `outcomes` is the target-rate table, one row per 25bp band, contiguous and
 always including `no change`. A band at `0.0` was priced at nothing; that is a
@@ -146,6 +169,10 @@ and `latest` in the same payload.
 `charts_skipped` names meetings with nothing to draw — fewer than two reported
 changes, or a market that has only ever priced no-change. Both are normal and
 neither is an error; `reason` says which.
+
+Right after a decision the charts thin out: the meeting that just happened is
+gone, and the one behind it may have too few points left to plot. That is
+correct, not a failure — do not reach for an older chart to fill the gap.
 
 Charts are rendered portrait for a phone. `FED_WATCH_CHART_ORIENTATION=landscape`
 is the override; do not use it unless the operator says they are at a desk.

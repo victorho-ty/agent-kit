@@ -31,7 +31,12 @@ def _emit(payload: dict) -> int:
 
 
 def _charts_for(history: list[dict], limit: int) -> tuple[list[dict], list[dict]]:
-    """One chart per meeting, plus the meetings too short to plot."""
+    """One chart per meeting, plus the meetings too short to plot.
+
+    Only upcoming meetings reach here: ``db._hydrate`` drops the decided ones
+    on the way out of storage, so a meeting cannot be charted from stale points
+    after its announcement just because it is still inside the reported window.
+    """
     charts.sweep()
     shaped = changes_module.series(history[-limit:])
     rendered, skipped = [], []
@@ -62,6 +67,10 @@ def cmd_check_changes(args) -> int:
         baseline = db.latest_reported(conn)
 
         if args.no_fetch:
+            # The fetching branch purges inside `snapshot.take`; this one writes
+            # nothing, so it has to ask. Without it, replaying an outage is the
+            # one path that can leave a decided meeting in the store untouched.
+            db.purge_past_meetings(conn, now.date())
             row = conn.execute(
                 "SELECT * FROM snapshots ORDER BY taken_at DESC LIMIT 1"
             ).fetchone()
@@ -115,6 +124,10 @@ def cmd_check_changes(args) -> int:
 def cmd_history(args) -> int:
     """On demand: the last N reported changes, summarised and charted."""
     with db.connect() as conn:
+        # `history` reads, but it is also the command most likely to be run the
+        # morning after a decision -- so it clears the decided meeting out for
+        # good rather than only filtering it from this one answer.
+        db.purge_past_meetings(conn)
         history = db.reported_history(conn, args.limit)
         if not history:
             raise InsufficientDataError(

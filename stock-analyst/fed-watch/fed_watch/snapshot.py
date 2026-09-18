@@ -31,6 +31,13 @@ def take(conn, *, now: datetime | None = None, meetings_tracked: int = MEETINGS_
     calendar = fomc.load()
     upcoming = fomc.upcoming(calendar, taken_at.date(), meetings_tracked)
 
+    # Housekeeping, before the new row goes in. A meeting that has been decided
+    # is not a forecast any more, and leaving its readings in the file is what
+    # had a passed meeting charted for as long as it sat inside the reported
+    # window. Everything written below is upcoming by construction, so this
+    # never touches the row about to be stored.
+    purged = db.purge_past_meetings(conn, taken_at.date())
+
     def month_has_meeting(year: int, month: int) -> bool:
         return fomc.month_has_meeting(calendar, year, month)
 
@@ -61,6 +68,11 @@ def take(conn, *, now: datetime | None = None, meetings_tracked: int = MEETINGS_
         )
     if failures:
         payload["failures"] = failures
+    # Present only when rows actually went, and never when nothing did. This is
+    # a housekeeping counter for whoever is debugging the store, not a finding;
+    # SKILL.md tells the agent not to narrate it.
+    if purged["meetings"]:
+        payload["purged"] = purged
     return payload
 
 

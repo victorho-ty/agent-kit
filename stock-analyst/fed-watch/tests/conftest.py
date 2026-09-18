@@ -36,6 +36,20 @@ CALENDAR = [
 ]
 
 
+# Every fixture below describes the world on 2026-09-11, and the calendar's
+# first meeting is five days after it. Since storage now filters decided
+# meetings out on the way back (`db._hydrate`), a suite that read the real
+# clock would start dropping 2026-09-16 from its own fixtures on 2026-09-17 and
+# fail for reasons having nothing to do with the code. Pinning is what
+# `FED_WATCH_NOW` is for.
+PINNED_NOW = "2026-09-12T09:00:00+08:00"
+
+
+@pytest.fixture(autouse=True)
+def pinned_clock(monkeypatch):
+    monkeypatch.setenv("FED_WATCH_NOW", PINNED_NOW)
+
+
 @pytest.fixture
 def policy() -> PolicyRate:
     return PolicyRate(

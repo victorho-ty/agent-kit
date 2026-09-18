@@ -3,6 +3,15 @@
 Every command prints one JSON object on stdout and exits with a code below. The
 one exception is `check-changes --quiet`, which prints a bare `1` or `0`.
 
+## Every meeting is an upcoming one
+
+No command returns a meeting whose date is before today in the configured zone
+(`Asia/Hong_Kong` by default). Storage filters them on read and deletes their
+rows on write, so `latest`, `current`, `changes` and `charts` cannot surface a
+decision that has already been announced — including from a stored snapshot
+taken before it. A meeting is kept through its own decision day and gone from
+the next.
+
 ## Exit codes
 
 | code | name | meaning |
@@ -64,6 +73,17 @@ Read the market now and store one row of history. Wakes nobody.
 `status` is `ok` or `partial`. On `partial`, `failures` maps each unreadable
 contract to why. `calendar_warning` appears when fewer than three FOMC dates
 remain ahead of today.
+
+`purged` appears **only when stored readings were deleted** — the first run
+after a decision, when the meeting that has now happened is cleared out of the
+store:
+
+```json
+"purged": {"cutoff": "2026-09-17", "meetings": 14, "outcomes": 41}
+```
+
+It is a housekeeping counter, not a finding, and there is no `purged` on a run
+that deleted nothing. `check-changes` carries the same field on the same terms.
 
 `outcomes` is contiguous across `step` and always contains `step: 0`. A band at
 `0.0` was priced at nothing.
@@ -218,4 +238,4 @@ The calendar, and which contract answers each date. Fetches nothing.
 | `FED_WATCH_TZ` | `Asia/Hong_Kong` |
 | `FED_WATCH_TIMEOUT` | `20.0` (seconds) |
 | `FED_WATCH_RETRIES` | `2` |
-| `FED_WATCH_NOW` | unset; pins the clock for tests and replay |
+| `FED_WATCH_NOW` | unset; pins the clock for tests and replay. It also sets the cutoff for dropping and purging decided meetings, so a pinned past instant resurrects them |

@@ -54,7 +54,7 @@ fed_watch/
 `probabilities.py` depends on nothing that touches a network or a clock, which
 is what lets the validation against CME run as an ordinary unit test.
 
-## Three decisions worth recording
+## Decisions worth recording
 
 ### The calendar is load-bearing, not decoration
 
@@ -68,6 +68,38 @@ month look clear and produces a confidently wrong number. Hence: the loader
 insists the dates are sorted, unique and parseable; running out is a hard
 `ERR_CONFIG` with a remedy rather than an empty result; and `snap` and
 `meetings` warn once fewer than three dates remain ahead.
+
+### A decided meeting is filtered *and* deleted
+
+`fomc.upcoming` has always dropped past meetings, but it only ever ran on the
+fetch path. Everything that read history back — the charts, `history`'s
+`latest`, `check-changes --no-fetch` — replayed whatever meeting dates the
+stored rows happened to hold. A snapshot is a record of what was upcoming when
+it was taken, so replaying one after the announcement presents a decided
+meeting as a forecast. The reported window is measured in *reported changes*,
+not days, and those only land on a move past the threshold; ten of them can
+span weeks. That is why 16 September 2026 was still being charted on the 18th.
+
+Two mechanisms, because either alone is insufficient:
+
+- **`db._hydrate` filters.** One chokepoint every reader already goes through,
+  so no future caller can forget it. Ordinals are renumbered on the way out —
+  a payload whose first meeting is `ordinal: 2` says the next decision is
+  missing.
+- **`db.purge_past_meetings` deletes.** Filtering leaves the rows in the file
+  for the next thing that queries the table to rediscover. `snap` and
+  `check-changes` purge before writing; `history` and `--no-fetch` purge
+  because they are otherwise the paths that never would.
+
+The cutoff is `meeting_date < today` in the configured zone, the same boundary
+`upcoming` draws: kept through its own decision day, because the announcement
+lands in the afternoon and until then the futures are still pricing it. The two
+must not disagree, or a meeting is fetched and immediately filtered.
+
+Only meeting and outcome rows go. The `snapshots` row and its `reported_at`
+stay, so tidying never moves the change baseline. A snapshot can therefore
+hydrate with an empty `meetings` list; that is a snapshot whose every meeting
+has happened, and it contributes nothing to a chart rather than breaking one.
 
 ### The effective rate is fetched, never assumed
 
@@ -101,7 +133,11 @@ per meeting within it; `outcomes` one row per target-range cell. Ordered by
 path — both readings the brief asked for, from one write.
 
 Timestamps are the isoformat of a timezone-aware instant in one fixed zone, so
-lexical ordering is chronological ordering.
+lexical ordering is chronological ordering. Meeting dates are ISO8601 for the
+same reason — it is what lets the purge compare them in SQL.
+
+The store is **not** an archive. Readings for a meeting that has been decided
+are deleted, not retained; see the fourth decision above.
 
 The database lives under `hermes-stock-analyst/`, shared with the stock-desk
 bundle, because state is scoped to the profile rather than the bundle. Charts

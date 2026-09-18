@@ -13,7 +13,14 @@ hour ago, and is reported once it adds up -- which is precisely what a
 threshold compared against the previous *poll* would hide forever.
 
 Timestamps are stored as the isoformat of a timezone-aware instant in one fixed
-zone, so lexical ordering is chronological ordering.
+zone, so lexical ordering is chronological ordering. Meeting dates are ISO8601
+for the same reason -- it is what lets the purge compare them in SQL.
+
+**This is not an archive.** A meeting that has been decided is dropped from
+every hydrated snapshot and its rows are deleted outright. A snapshot records
+what was upcoming when it was taken, and handing that back verbatim days later
+is how an announced decision gets presented as a forecast. See
+:func:`purge_past_meetings` and :func:`_hydrate`.
 
 Writes go through :func:`connect` and nothing else. The agent never opens this
 file.
@@ -23,11 +30,11 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Iterator
 
-from . import settings
+from . import clock, settings
 from .errors import DatabaseError
 
 SCHEMA_VERSION = 1
@@ -222,20 +229,63 @@ def mark_reported(conn: sqlite3.Connection, snapshot_id: int, reported_at: datet
     )
 
 
+def purge_past_meetings(conn: sqlite3.Connection, today: date | None = None) -> dict:
+    """Delete every stored reading for a meeting that has already happened.
+    ``meeting_date < today``, so a meeting is kept through its own decision day:
+    the announcement lands in the afternoon and until it does the futures are
+    still pricing it. That is the same boundary :func:`fed_watch.config.fomc.upcoming`
+    draws, and the two must not disagree.
+
+    Dates are stored as ISO8601, so the lexical comparison SQLite makes here is
+    the chronological one.
+    """
+    cutoff = (today or clock.today()).isoformat()
+    outcomes = conn.execute("DELETE FROM outcomes WHERE meeting_date < ?", (cutoff,)).rowcount
+    meetings = conn.execute(
+        "DELETE FROM meeting_snapshots WHERE meeting_date < ?", (cutoff,)
+    ).rowcount
+    return {
+        "cutoff": cutoff,
+        "meetings": max(meetings, 0),
+        "outcomes": max(outcomes, 0),
+    }
+
+
 def count_snapshots(conn: sqlite3.Connection) -> int:
     return int(conn.execute("SELECT COUNT(*) AS n FROM snapshots").fetchone()["n"])
 
 
 def _hydrate(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
-    """One snapshot with its meetings and their outcome tables attached."""
+    """One snapshot with its meetings and their outcome tables attached.
+
+    **Meetings that have already happened are dropped here**, which is the only
+    reason every reader gets that for free. A stored snapshot is a record of
+    what was upcoming when it was taken, and replaying it verbatim days later is
+    how a decided meeting ends up presented as a forecast -- charted from stale
+    points, or listed as the next decision because no change has been reported
+    since it passed. The fetch path has always filtered by today; this is the
+    same filter on the way back out.
+
+    Purging removes these rows for good (see :func:`purge_past_meetings`), but
+    only runs when something is written. Between purges this is what holds.
+    """
+    cutoff = clock.today().isoformat()
     snapshot = dict(row)
     meetings = [
         dict(entry)
         for entry in conn.execute(
-            "SELECT * FROM meeting_snapshots WHERE snapshot_id = ? ORDER BY ordinal",
-            (row["id"],),
+            """
+            SELECT * FROM meeting_snapshots
+            WHERE snapshot_id = ? AND meeting_date >= ? ORDER BY ordinal
+            """,
+            (row["id"], cutoff),
         ).fetchall()
     ]
+    # Ordinals are renumbered because they are read as "1 is the next decision".
+    # Carrying the stored ones through a filter would leave a payload whose
+    # first meeting is ordinal 2, which says the next decision is missing.
+    for position, meeting in enumerate(meetings, 1):
+        meeting["ordinal"] = position
     for meeting in meetings:
         meeting["outcomes"] = [
             dict(outcome)

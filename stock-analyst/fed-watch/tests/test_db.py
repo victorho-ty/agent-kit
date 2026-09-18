@@ -74,3 +74,121 @@ def test_a_future_schema_is_refused_rather_than_written_to(db_path, policy):
     with pytest.raises(DatabaseError):
         with db.connect():
             pass
+
+
+# ------------------------------------------------- decided meetings leave the store
+
+
+def _store_dates(conn, policy, quotes, month_has_meeting, hour: int, meetings: list[date]):
+    priced = probabilities.solve(policy, meetings, quotes, month_has_meeting)
+    return db.store_snapshot(conn, _stamp(hour), policy, priced, "test", "ok", {})
+
+
+def _raw_counts(conn) -> tuple[int, int]:
+    return (
+        conn.execute("SELECT COUNT(*) AS n FROM meeting_snapshots").fetchone()["n"],
+        conn.execute("SELECT COUNT(*) AS n FROM outcomes").fetchone()["n"],
+    )
+
+
+def test_a_decided_meeting_is_filtered_out_of_a_stored_snapshot(
+    db_path, policy, quotes, month_has_meeting, monkeypatch
+):
+    """The bug this exists for: a snapshot replayed after the announcement."""
+    with db.connect() as conn:
+        snapshot_id = _store(conn, policy, quotes, month_has_meeting, 9)
+
+    monkeypatch.setenv("FED_WATCH_NOW", "2026-09-18T09:00:00+08:00")
+    with db.connect() as conn:
+        stored = db.load_snapshot(conn, snapshot_id)
+
+    assert [m["meeting_date"] for m in stored["meetings"]] == ["2026-10-28"]
+
+
+def test_a_meeting_survives_its_own_decision_day(
+    db_path, policy, quotes, month_has_meeting, monkeypatch
+):
+    """Announced in the afternoon; until then the futures are still pricing it."""
+    with db.connect() as conn:
+        snapshot_id = _store(conn, policy, quotes, month_has_meeting, 9)
+
+    monkeypatch.setenv("FED_WATCH_NOW", "2026-09-16T09:00:00+08:00")
+    with db.connect() as conn:
+        stored = db.load_snapshot(conn, snapshot_id)
+
+    assert [m["meeting_date"] for m in stored["meetings"]] == ["2026-09-16", "2026-10-28"]
+
+
+def test_ordinals_are_renumbered_so_the_first_meeting_is_the_next_decision(
+    db_path, policy, quotes, month_has_meeting, monkeypatch
+):
+    with db.connect() as conn:
+        snapshot_id = _store(conn, policy, quotes, month_has_meeting, 9)
+
+    monkeypatch.setenv("FED_WATCH_NOW", "2026-09-18T09:00:00+08:00")
+    with db.connect() as conn:
+        stored = db.load_snapshot(conn, snapshot_id)
+
+    # Stored as ordinal 2 behind 2026-09-16; it is the next decision now.
+    assert [m["ordinal"] for m in stored["meetings"]] == [1]
+
+
+def test_purge_removes_the_rows_and_not_only_the_answer(
+    db_path, policy, quotes, month_has_meeting
+):
+    with db.connect() as conn:
+        _store(conn, policy, quotes, month_has_meeting, 9)
+        _store(conn, policy, quotes, month_has_meeting, 10)
+        meetings_before, outcomes_before = _raw_counts(conn)
+
+        report = db.purge_past_meetings(conn, date(2026, 9, 18))
+        meetings_after, outcomes_after = _raw_counts(conn)
+
+    assert meetings_before == 4  # two snapshots, two meetings each
+    assert report["meetings"] == 2
+    assert report["cutoff"] == "2026-09-18"
+    assert meetings_after == 2
+    assert outcomes_after < outcomes_before
+    assert report["outcomes"] == outcomes_before - outcomes_after
+
+
+def test_purge_keeps_a_meeting_through_its_own_decision_day(
+    db_path, policy, quotes, month_has_meeting
+):
+    with db.connect() as conn:
+        _store(conn, policy, quotes, month_has_meeting, 9)
+        report = db.purge_past_meetings(conn, date(2026, 9, 16))
+        assert report["meetings"] == 0
+        assert _raw_counts(conn)[0] == 2
+
+
+def test_purge_leaves_the_snapshot_rows_and_their_reported_marks_alone(
+    db_path, policy, quotes, month_has_meeting
+):
+    """Only meeting rows go. The reported baseline is not a casualty of tidying."""
+    with db.connect() as conn:
+        first = _store(conn, policy, quotes, month_has_meeting, 9)
+        db.mark_reported(conn, first, _stamp(9))
+        db.purge_past_meetings(conn, date(2026, 9, 18))
+
+        assert db.count_snapshots(conn) == 1
+        assert db.latest_reported(conn)["id"] == first
+
+
+def test_a_decided_meeting_is_not_charted_from_stale_history(
+    db_path, policy, quotes, month_has_meeting, monkeypatch
+):
+    """The reported window spans the announcement; the old meeting must not plot."""
+    from fed_watch import changes
+
+    with db.connect() as conn:
+        for hour in (9, 10):
+            db.mark_reported(
+                conn, _store(conn, policy, quotes, month_has_meeting, hour), _stamp(hour)
+            )
+
+    monkeypatch.setenv("FED_WATCH_NOW", "2026-09-18T09:00:00+08:00")
+    with db.connect() as conn:
+        shaped = changes.series(db.reported_history(conn, 10))
+
+    assert sorted(shaped) == ["2026-10-28"]

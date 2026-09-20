@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Beta Exchange Notices</title>
+  <subtitle>Trading, listing and securities notices from the Beta exchange.</subtitle>
+  <link rel="self" href="https://beta.example.org/feed.atom"/>
+  <link rel="alternate" href="https://beta.example.org/"/>
+  <updated>2026-09-18T09:00:00Z</updated>
+  <entry>
+    <title>Treasury yields climb after strong retail sales</title>
+    <link rel="replies" href="https://beta.example.org/notices/yields/comments"/>
+    <link rel="alternate" href="https://beta.example.org/notices/yields"/>
+    <id>urn:beta:notice:9001</id>
+    <summary>The 10-year yield rose four basis points following the retail sales release.</summary>
+    <published>2026-09-18T09:00:00Z</published>
+  </entry>
+  <entry>
+    <title>Exchange fines broker over reporting failures</title>
+    <link rel="alternate" href="https://beta.example.org/notices/enforcement-2026-14"/>
+    <id>urn:beta:notice:9002</id>
+    <content type="html">&lt;div&gt;An enforcement settlement was reached with the member firm.&lt;/div&gt;</content>
+    <updated>2026-09-17T11:15:00Z</updated>
+  </entry>
+  <entry>
+    <title>Hang Seng index futures volumes hit record</title>
+    <link rel="alternate" href="https://beta.example.org/notices/hsi-volumes"/>
+    <id>urn:beta:notice:9003</id>
+    <summary>Hong Kong equity derivatives turnover set a new high.</summary>
+    <updated>2026-09-16T02:40:00Z</updated>
+  </entry>
+</feed>

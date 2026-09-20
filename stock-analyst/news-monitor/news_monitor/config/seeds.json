@@ -1,0 +1,31 @@
+// Bootstrap feeds, applied once to an empty database and never again.
+//
+// This file is NOT the source of truth. The `feed` table is: once a feed is in
+// the database it is edited there -- `news-monitor enable|disable`, and
+// `news-monitor add` for new ones -- because discovery writes rows at run time
+// and a JSON file the tools also write would be two truths that drift.
+//
+// Editing a url here after first run changes nothing. Add the new url with
+// `news-monitor add` and disable the old row.
+{
+  "feeds": [
+    {
+      "name": "federal-reserve",
+      "url": "https://www.federalreserve.gov/feeds/press_all.xml",
+      "category": "central-bank",
+      "note": "Every Fed press release: FOMC statements, minutes, speeches, enforcement, regulatory."
+    },
+    {
+      "name": "dj-markets",
+      "url": "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain",
+      "category": "markets",
+      "note": "Dow Jones markets wire."
+    },
+    {
+      "name": "cnbc-finance",
+      "url": "https://www.cnbc.com/id/20910258/device/rss/rss.html",
+      "category": "markets",
+      "note": "CNBC finance."
+    }
+  ]
+}

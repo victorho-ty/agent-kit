@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Epsilon Markets Daily</title>
+    <link>https://epsilon.example.com/</link>
+    <description>Daily equity market and bond yield commentary for investors.</description>
+    <item>
+      <title>Stocks close higher as treasury yields ease</title>
+      <link>https://epsilon.example.com/2019/stocks-higher</link>
+      <description>The equity market rallied while bond yields fell.</description>
+      <pubDate>Fri, 20 Dec 2019 21:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Earnings season preview for the S&amp;P 500</title>
+      <link>https://epsilon.example.com/2019/earnings-preview</link>
+      <description>Investor expectations for quarterly earnings across the index.</description>
+      <pubDate>Thu, 19 Dec 2019 21:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Federal Reserve leaves monetary policy unchanged</title>
+      <link>https://epsilon.example.com/2019/fed-unchanged</link>
+      <description>The central bank held rates and signalled patience.</description>
+      <pubDate>Wed, 11 Dec 2019 19:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

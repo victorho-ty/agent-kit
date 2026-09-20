@@ -1,0 +1,40 @@
+[project]
+name = "news-monitor"
+version = "0.1.0"
+description = "Polls a database of finance RSS feeds, hands the agent every headline it has not seen before, and grows its own source list"
+requires-python = ">=3.12"
+
+# One runtime dependency, and it is data rather than code: zoneinfo prefers the
+# operating system's tz database and only falls back to this copy, which is what
+# makes Asia/Hong_Kong resolve on Windows and in minimal containers.
+#
+# The feeds are RSS 2.0, RSS 1.0 and Atom, all parsed with the standard
+# library's xml.etree. A feed reader would be a second dependency for about
+# eighty lines of work against three formats that have not moved in twenty
+# years. HTTP is urllib for the same reason -- these are ordinary public
+# documents and an HTTP stack would be something the scheduler has to keep
+# alive for no behaviour we need.
+dependencies = [
+    "tzdata>=2024.1",
+]
+
+[project.scripts]
+news-monitor = "news_monitor.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["news_monitor", "news_monitor.config"]
+
+[tool.setuptools.package-data]
+"news_monitor.config" = ["seeds.json", "taxonomy.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]

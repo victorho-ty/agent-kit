@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Delta Gardening Weekly</title>
+    <link>https://delta.example.org/</link>
+    <description>Tomatoes, compost and greenhouse tips.</description>
+    <item>
+      <title>Five ways to overwinter your tomato plants</title>
+      <link>https://delta.example.org/overwinter</link>
+      <description>Bring the pots indoors before the first frost.</description>
+      <pubDate>Mon, 15 Sep 2026 08:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Choosing compost for raised beds</title>
+      <link>https://delta.example.org/compost</link>
+      <description>A peat-free mix works for most vegetables.</description>
+      <pubDate>Mon, 08 Sep 2026 08:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Greenhouse ventilation in early autumn</title>
+      <link>https://delta.example.org/ventilation</link>
+      <description>Keep the vents open on warm afternoons.</description>
+      <pubDate>Mon, 01 Sep 2026 08:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

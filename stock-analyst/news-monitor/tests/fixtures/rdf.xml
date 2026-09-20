@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns="http://purl.org/rss/1.0/"
+         xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel rdf:about="https://gamma.example.net/rss">
+    <title>Gamma Statistics Office</title>
+    <description>Official releases: employment, prices, output.</description>
+    <link>https://gamma.example.net/</link>
+  </channel>
+  <item rdf:about="https://gamma.example.net/releases/payrolls">
+    <title>Employment situation: payrolls up 142,000 in August</title>
+    <link>https://gamma.example.net/releases/payrolls</link>
+    <description>Nonfarm payroll employment rose and the unemployment rate was little changed.</description>
+    <dc:date>2026-09-05T12:30:00Z</dc:date>
+  </item>
+  <item rdf:about="https://gamma.example.net/releases/ppi">
+    <title>Producer price index unchanged in August</title>
+    <link>https://gamma.example.net/releases/ppi</link>
+    <description>The producer price index for final demand was unchanged.</description>
+    <dc:date>2026-09-11T12:30:00Z</dc:date>
+  </item>
+  <item rdf:about="https://gamma.example.net/releases/jolts">
+    <title>Job openings little changed at 7.2 million</title>
+    <link>https://gamma.example.net/releases/jolts</link>
+    <description>JOLTS reported job openings little changed on the month.</description>
+    <dc:date>2026-09-03T12:30:00Z</dc:date>
+  </item>
+</rdf:RDF>

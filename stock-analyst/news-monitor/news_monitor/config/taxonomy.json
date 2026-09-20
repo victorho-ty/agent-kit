@@ -1,0 +1,58 @@
+// The vocabulary the tools match against a headline. Three lists, three jobs.
+//
+// Every term is matched case-insensitively on word boundaries against the
+// headline and the feed's own summary paragraph -- nothing here reads an
+// article body, and nothing here is a judgement. A match is a hint the agent
+// may overrule; an absence of matches is not a claim that the item is
+// irrelevant.
+//
+// "sectors" bucket an item for the digest. Keep the keys stable: they reach the
+// agent by name and a rename silently re-buckets history.
+//
+// "signals" mark what kind of event it is. The skill reads these to decide
+// whether an item is durable enough to belong in the vault.
+//
+// "finance_terms" are the quality gate for a *feed* discovered at run time, not
+// a filter on items. A candidate feed must hit at least `min_finance_hits`
+// distinct terms across its title, description and recent headlines before it
+// is enabled without review.
+{
+  "sectors": {
+    "macro-rates":     ["fomc", "federal reserve", "interest rate", "rate cut", "rate hike", "treasury", "yield curve", "bond yield", "basis point", "monetary policy", "quantitative tightening", "ecb", "bank of japan", "boe", "pboc"],
+    "inflation":       ["inflation", "cpi", "ppi", "pce", "consumer price", "producer price", "deflation", "disinflation"],
+    "labour":          ["payroll", "unemployment", "jobless", "jolts", "employment situation", "labor market", "labour market", "wage growth"],
+    "credit":          ["credit spread", "high yield", "investment grade", "default rate", "leveraged loan", "cds", "downgrade", "upgrade", "moody", "s&p global ratings", "fitch"],
+    "banks":           ["bank", "lender", "deposit", "capital requirement", "basel", "stress test", "fdic", "occ", "systemically important"],
+    "semiconductors":  ["semiconductor", "chipmaker", "chip", "foundry", "wafer", "nvidia", "tsmc", "asml", "amd", "intel", "memory chip", "hbm"],
+    "technology":      ["software", "cloud", "data center", "artificial intelligence", "saas", "cybersecurity", "smartphone"],
+    "energy":          ["crude", "oil price", "opec", "natural gas", "lng", "refinery", "brent", "wti", "barrel"],
+    "commodities":     ["gold", "copper", "iron ore", "wheat", "soybean", "aluminium", "aluminum", "lithium", "commodity price"],
+    "healthcare":      ["pharmaceutical", "biotech", "fda", "clinical trial", "drug pricing", "medicare"],
+    "consumer":        ["retail sales", "consumer spending", "same-store", "e-commerce", "discretionary spending"],
+    "industrials":     ["manufacturing", "ism", "pmi", "factory orders", "durable goods", "supply chain", "freight"],
+    "real-estate":     ["housing start", "home sales", "mortgage rate", "reit", "commercial real estate", "property market"],
+    "china-hk":        ["hong kong", "hang seng", "hkex", "china", "mainland", "yuan", "renminbi", "shanghai composite", "shenzhen"],
+    "fx":              ["dollar index", "exchange rate", "currency", "yen", "euro", "devaluation", "intervention"],
+    "crypto":          ["bitcoin", "ethereum", "stablecoin", "crypto", "digital asset"],
+    "policy":          ["tariff", "sanction", "export control", "antitrust", "sec charges", "regulation", "executive order", "government shutdown", "debt ceiling"]
+  },
+
+  "signals": {
+    "policy-decision":  ["fomc statement", "rate decision", "policy statement", "minutes of the", "monetary policy decision", "federal funds target", "rates unchanged", "rates steady", "holds rates", "hold rates", "held rates", "leaves rates", "left rates", "keeps rates", "raises rates", "raised rates", "cuts rates", "cut rates", "lowers rates", "rate cut", "rate hike"],
+    "data-release":     ["cpi", "ppi", "pce", "gdp", "nonfarm payroll", "employment situation", "jolts", "retail sales", "ism", "pmi", "consumer confidence", "housing start"],
+    "earnings":         ["earnings", "quarterly results", "guidance", "revenue rose", "revenue fell", "profit warning", "outlook cut", "outlook raised", "beats estimates", "misses estimates"],
+    "corporate-action": ["acquisition", "merger", "takeover", "spin-off", "buyback", "dividend", "ipo", "stake", "bankruptcy", "chapter 11", "restructuring"],
+    "regulatory":       ["sec", "doj", "ftc", "antitrust", "enforcement", "settlement", "fine", "investigation", "subpoena", "rule change", "final rule"],
+    "rating-action":    ["downgrade", "upgrade", "outlook negative", "outlook positive", "credit watch", "default"],
+    "supply-shock":     ["output cut", "production halt", "export ban", "sanction", "tariff", "embargo", "shortage", "strike"],
+    "leadership":       ["chief executive", "ceo steps down", "resigns", "appointed", "board seat", "activist investor"]
+  },
+
+  "finance_terms": [
+    "market", "stock", "equity", "bond", "yield", "rate", "inflation", "earnings",
+    "trading", "investor", "fund", "index", "economy", "economic", "federal reserve",
+    "treasury", "currency", "commodity", "dividend", "valuation", "portfolio",
+    "securities", "nasdaq", "s&p", "dow jones", "shares", "ipo", "merger",
+    "central bank", "gdp", "monetary", "fiscal", "credit", "banking", "exchange"
+  ]
+}

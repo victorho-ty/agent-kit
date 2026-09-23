@@ -45,14 +45,6 @@
       "min_interval_minutes": 180,
       "max_items": 30,
       "enabled": true
-    },
-    {
-      "name": "cnbc-finance",
-      "category": "finance",
-      "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",
-      "kind": "rss",
-      "max_items": 30,
-      "enabled": true
     }
 
 //    A source that should not be hit as often as the rest. min_interval_minutes

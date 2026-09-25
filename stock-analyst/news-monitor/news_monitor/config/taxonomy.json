@@ -1,4 +1,11 @@
-// The vocabulary the tools match against a headline. Three lists, three jobs.
+// The vocabulary the tools match against a headline. Four lists, four jobs.
+//
+// "exclude" is the only one that changes what reaches the agent. An item whose
+// headline or summary matches any term is dropped before it is stored: never
+// returned, never in the ledger. Terms match as word stems -- "taiwan" also
+// drops "Taiwanese", "australia" also drops "Australian" -- and case is
+// ignored. Removing a term later lets matching stories through from then on;
+// nothing already dropped comes back, because nothing was kept.
 //
 // Every term is matched case-insensitively on word boundaries against the
 // headline and the feed's own summary paragraph -- nothing here reads an
@@ -12,11 +19,13 @@
 // "signals" mark what kind of event it is. The skill reads these to decide
 // whether an item is durable enough to belong in the vault.
 //
-// "finance_terms" are the quality gate for a *feed* discovered at run time, not
-// a filter on items. A candidate feed must hit at least `min_finance_hits`
+// "finance_terms" are the quality gate for a *feed* offered to `add`, not a
+// filter on items. A candidate feed must hit at least `min_finance_hits`
 // distinct terms across its title, description and recent headlines before it
 // is enabled without review.
 {
+  "exclude": ["australia", "taiwan", "taiex", "india", "qatar", "germany", "ANZ", "Scam alert"],
+
   "sectors": {
     "macro-rates":     ["fomc", "federal reserve", "interest rate", "rate cut", "rate hike", "treasury", "yield curve", "bond yield", "basis point", "monetary policy", "quantitative tightening", "ecb", "bank of japan", "boe", "pboc"],
     "inflation":       ["inflation", "cpi", "ppi", "pce", "consumer price", "producer price", "deflation", "disinflation"],

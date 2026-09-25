@@ -75,7 +75,7 @@ def test_wellformed_xml_with_no_items_parses_to_nothing_rather_than_raising():
     """Distinct from the case above, and it must stay distinct.
 
     A tracked feed that has emptied out is ``zero_yield`` -- a real condition
-    with its own report -- not a fetch failure. Only ``discover`` treats an
+    with its own report -- not a fetch failure. Only ``gate`` treats an
     itemless document as disqualifying, because there it means the candidate is
     not a feed.
     """

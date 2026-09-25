@@ -40,3 +40,20 @@ def test_an_item_with_no_matches_gets_empty_lists_not_a_guess(taxonomy):
     sectors, signals = classify("Five ways to overwinter your tomato plants", None, taxonomy)
     assert sectors == []
     assert signals == []
+
+
+def test_exclude_matches_the_term_as_a_word_stem(taxonomy):
+    assert taxonomy.excluded_by("Australian dollar slides after RBA decision") == "australia"
+    assert taxonomy.excluded_by("Taiwanese exporters brace for tariffs") == "taiwan"
+    assert taxonomy.excluded_by("TAIEX closes at a record") == "taiex"
+
+
+def test_exclude_does_not_match_a_neighbouring_word(taxonomy):
+    assert taxonomy.excluded_by("Austria's central bank holds rates") is None
+    assert taxonomy.excluded_by("Fed holds rates steady") is None
+
+
+def test_finance_hits_names_the_terms_it_found(taxonomy):
+    hits = taxonomy.finance_hits("Bond investors watch the Federal Reserve")
+    assert "bond" in hits
+    assert "federal reserve" in hits

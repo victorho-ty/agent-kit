@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from news_monitor import discover
+from news_monitor import gate
 from news_monitor.cli import run
 from news_monitor.errors import ExitCode
 from news_monitor.fetch import Response
@@ -40,7 +40,7 @@ def offline(monkeypatch):
             return Response(url=url, status=200, text=fixture_text(mapping[url]))
 
         monkeypatch.setattr("news_monitor.fetch.get", fake_get)
-        monkeypatch.setattr(discover, "_default_fetcher", fake_get)
+        monkeypatch.setattr(gate, "_default_fetcher", fake_get)
 
     return route
 
@@ -73,7 +73,7 @@ def test_add_stores_a_passing_candidate_enabled(capsys, offline):
 
     _, listed = _run(capsys, ["feeds"])
     added = next(feed for feed in listed["feeds"] if feed["name"] == "acme-wire-markets")
-    assert added["origin"] == "discovered"
+    assert added["origin"] == "added"
 
 
 def test_add_stores_an_off_topic_candidate_disabled_with_its_reason(capsys, offline):
@@ -83,7 +83,8 @@ def test_add_stores_an_off_topic_candidate_disabled_with_its_reason(capsys, offl
     assert code == int(ExitCode.OK)
     assert payload["enabled"] is False
     assert payload["gate"]["verdict"] == "off_topic"
-    # Stored rather than dropped, or the next sweep proposes it again forever.
+    # Stored rather than dropped: the operator asked for it, and one `enable`
+    # overrides the gate.
     assert payload["stored"] is True
 
 
@@ -153,6 +154,8 @@ def test_check_then_mark_drains_the_ledger(capsys, offline, monkeypatch):
 
     _, checked = _run(capsys, ["check", "--feed", "acme"])
     assert [item["title"] for item in checked["items"]] == ["OPEC agrees an output cut"]
+    # Sources are added on the operator's request only; check never prompts a search.
+    assert "discovery" not in checked
     assert checked["items"][0]["sector_hints"] == ["energy"]
     assert checked["items"][0]["signals"] == ["supply-shock"]
     assert checked["items"][0]["url"] == "https://wire.example.com/markets/opec"

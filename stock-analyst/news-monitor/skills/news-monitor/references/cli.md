@@ -49,8 +49,8 @@ news-monitor check --limit 10
   ],
   "feed_failures": [],
   "seeded_feeds": [],
+  "excluded": 3,
   "items": [ ... ],
-  "discovery": { ... },
   "pending_items": 2
 }
 ```
@@ -70,6 +70,12 @@ Per-feed `status`:
 A feed's first successful check reports `absorbed` instead of `new`, and the run
 lists it under `seeded_feeds`. Those items are stored pre-stamped: they are
 history, not news.
+
+`excluded` — per feed and in total — counts entries dropped by the `exclude`
+list in `taxonomy.json` (terms the operator keeps, matched as word stems in the
+headline or summary). They are never stored, so a story still in its feed is
+counted again each run that re-fetches it; a 304 does not. With `--dry-run`,
+each `sample` row carries `excluded_by`: the matching term, or `null`.
 
 ### One item
 
@@ -97,26 +103,13 @@ history, not news.
   means no keyword matched, not that the item is unimportant.
 - `id` is what `mark` takes.
 
-### `discovery`
-
-```json
-{
-  "due": true,
-  "interval_hours": 0,
-  "last_prompted_at": "2026-09-19T08:05:00+08:00",
-  "tracked_urls": ["https://www.federalreserve.gov/feeds/press_all.xml", "..."]
-}
-```
-
-`due` false means skip the sweep entirely this run. `tracked_urls` is every feed
-in the database, enabled or not — read it before proposing anything.
-
 ---
 
 ## `add`
 
-Offer a url as a new source. It is fetched, parsed and gated before it becomes a
-row.
+Add a source **the operator asked for**. Never run it on your own initiative —
+`check` does not propose sources and you do not search for them. The url is
+fetched, parsed and gated before it becomes a row.
 
 ```bash
 news-monitor add --url https://example.com/markets.rss --category markets --note "Wire markets desk"
@@ -170,7 +163,7 @@ news-monitor feeds --enabled --category central-bank
 ```
 
 One object per source: `name`, `url`, `category`, `note`, `enabled`, `origin`
-(`seed` | `discovered`), `gate_verdict`, `last_ok_at`, `consecutive_failures`,
+(`seed`, or `added` for one added on request), `gate_verdict`, `last_ok_at`, `consecutive_failures`,
 `last_error`, `recent_yield`, `seeded`, `items_seen`, `items_pending`,
 `latest_seen_at`.
 
@@ -182,7 +175,7 @@ One object per source: `name`, `url`, `category`, `note`, `enabled`, `origin`
 
 ```bash
 news-monitor enable --feed example-markets
-news-monitor disable --feed marketwatch-top
+news-monitor disable --feed dj-markets
 ```
 
 Takes a name or a url. Returns `changed: false` when the feed was already in

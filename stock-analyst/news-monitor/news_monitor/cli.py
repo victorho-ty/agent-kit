@@ -12,6 +12,7 @@ message and an item that was never reported must come round again.
 
 ``add``, ``enable`` and ``disable`` are the source list's whole editing surface.
 There is no config file to edit -- the ``feed`` table is the source of truth.
+All three act on the operator's request only; ``check`` never proposes a source.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ import sys
 from urllib.parse import urlsplit
 
 from . import check as check_run
-from . import clock, db, discover, settings
+from . import clock, db, gate, settings
 from .config import load_seeds, load_taxonomy
 from .errors import CandidateError, ExitCode, NewsMonitorError, NotFoundError
 
@@ -60,7 +61,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     add = sub.add_parser(
         "add",
-        help="Offer a url as a new source. Fetched, parsed and gated before it becomes a row.",
+        help="Add a source the operator asked for. Fetched, parsed and gated before it "
+             "becomes a row.",
     )
     add.add_argument("--url", required=True)
     add.add_argument("--name", help="Defaults to a slug of the feed's own title.")
@@ -185,7 +187,7 @@ def _cmd_add(args, conn, now) -> int:
             url=url, reason="already_tracked", feed=existing.name, enabled=existing.enabled,
         )
 
-    probe = discover.probe(url, taxonomy)
+    probe = gate.probe(url, taxonomy)
     if db.find_feed(conn, probe.url) is not None:
         # The url redirected onto something already on the list -- a publisher
         # consolidating two sections, or a shortener. Caught here rather than by
@@ -196,10 +198,10 @@ def _cmd_add(args, conn, now) -> int:
             url=url, resolved_url=probe.url, reason="already_tracked", feed=tracked.name,
         )
 
-    verdict = discover.judge(probe, now)
+    verdict = gate.judge(probe, now)
     enabled = verdict.enable if args.force_state is None else args.force_state
-    name = args.name or discover.unique_name(
-        discover.slugify(probe.title or "", urlsplit(probe.url).netloc),
+    name = args.name or gate.unique_name(
+        gate.slugify(probe.title or "", urlsplit(probe.url).netloc),
         {feed.name for feed in db.feeds(conn)},
     )
 
@@ -219,7 +221,7 @@ def _cmd_add(args, conn, now) -> int:
         db.add_feed(
             conn,
             name=name, url=probe.url, category=args.category, note=args.note,
-            enabled=enabled, origin="discovered",
+            enabled=enabled, origin="added",
             gate_verdict=verdict.reason, gate_detail=json.dumps(verdict.detail),
             now=now,
         )

@@ -156,39 +156,6 @@ def test_dry_run_writes_nothing_and_shows_what_a_feed_carries(conn, taxonomy, no
     assert db.recent_runs(conn) == []
 
 
-def test_discovery_is_due_every_run_by_default_and_ships_the_tracked_list(
-    conn, taxonomy, now, fetcher
-):
-    feeds = _feeds(conn, now, ("acme", ACME, "markets"))
-    result = check_run.check(
-        conn, taxonomy, feeds, now, delay=0, fetcher=fetcher({ACME: "rss20.xml"})
-    )
-
-    assert result["discovery"]["due"] is True
-    assert result["discovery"]["tracked_urls"] == [ACME]
-
-
-def test_a_discovery_interval_is_respected_even_when_a_sweep_finds_nothing(
-    conn, taxonomy, now, fetcher, monkeypatch
-):
-    monkeypatch.setenv("NEWS_MONITOR_DISCOVERY_HOURS", "24")
-    feeds = _feeds(conn, now, ("acme", ACME, "markets"))
-
-    first = check_run.check(conn, taxonomy, feeds, now, delay=0, fetcher=fetcher({ACME: "rss20.xml"}))
-    soon = check_run.check(
-        conn, taxonomy, db.feeds(conn), now + timedelta(hours=1), delay=0,
-        fetcher=fetcher({ACME: Response(url=ACME, status=304)}),
-    )
-    tomorrow = check_run.check(
-        conn, taxonomy, db.feeds(conn), now + timedelta(hours=25), delay=0,
-        fetcher=fetcher({ACME: Response(url=ACME, status=304)}),
-    )
-
-    assert first["discovery"]["due"] is True
-    assert soon["discovery"]["due"] is False
-    assert tomorrow["discovery"]["due"] is True
-
-
 def test_a_run_row_records_what_happened(conn, taxonomy, now, fetcher):
     feeds = _feeds(conn, now, ("acme", ACME, "markets"), ("dead", "https://gone.example/x", "markets"))
     check_run.check(conn, taxonomy, feeds, now, delay=0, fetcher=fetcher({ACME: "rss20.xml"}))
@@ -206,7 +173,7 @@ def test_a_run_row_records_what_happened(conn, taxonomy, now, fetcher):
 def test_a_named_disabled_feed_is_still_checked_when_asked_for(conn, now):
     db.add_feed(
         conn, name="paused", url=ACME, category="markets", note=None,
-        enabled=False, origin="discovered", gate_verdict="off_topic", gate_detail=None, now=now,
+        enabled=False, origin="added", gate_verdict="off_topic", gate_detail=None, now=now,
     )
     assert db.select_feeds(conn, None, include_disabled=False) == []
     assert [feed.name for feed in db.select_feeds(conn, ["paused"])] == ["paused"]
@@ -221,3 +188,50 @@ def test_a_fetch_error_is_recorded_and_not_raised(conn, taxonomy, now):
     result = check_run.check(conn, taxonomy, feeds, now, delay=0, fetcher=always_fails)
     assert result["feeds"][0]["status"] == "error"
     assert "503" in result["feeds"][0]["error"]
+
+
+def test_excluded_topics_are_never_stored_or_returned(conn, taxonomy, now, fetcher):
+    feeds = _feeds(conn, now, ("acme", ACME, "markets"))
+    check_run.check(conn, taxonomy, feeds, now, delay=0, fetcher=fetcher({ACME: "rss20.xml"}))
+
+    mixed = (
+        '<rss version="2.0"><channel><title>Acme Wire Markets</title>'
+        "<item><title>Taiwan export orders jump on AI demand</title>"
+        "<link>https://wire.example.com/markets/tw-orders</link></item>"
+        "<item><title>Iron ore slips as miners report output</title>"
+        "<link>https://wire.example.com/markets/ore</link>"
+        "<description>Australian producers lifted shipments.</description></item>"
+        "<item><title>Treasury yields climb after strong retail sales</title>"
+        "<link>https://wire.example.com/markets/yields</link></item>"
+        "</channel></rss>"
+    )
+    result = check_run.check(
+        conn, taxonomy, db.feeds(conn), now + timedelta(hours=1), delay=0,
+        fetcher=lambda url, **kw: Response(url=url, status=200, text=mixed),
+    )
+
+    # The second item names Australia only in its summary, and is dropped too.
+    assert [item["title"] for item in result["items"]] == [
+        "Treasury yields climb after strong retail sales"
+    ]
+    assert result["excluded"] == 2
+    assert result["feeds"][0]["excluded"] == 2
+    assert db.find_item(conn, "https://wire.example.com/markets/tw-orders") is None
+
+
+def test_dry_run_shows_what_the_exclude_list_would_drop(conn, taxonomy, now):
+    feeds = _feeds(conn, now, ("acme", ACME, "markets"))
+    document = (
+        '<rss version="2.0"><channel><title>t</title>'
+        "<item><title>TAIEX hits a record</title><link>https://x.example/1</link></item>"
+        "<item><title>Gold rallies</title><link>https://x.example/2</link></item>"
+        "</channel></rss>"
+    )
+    result = check_run.check(
+        conn, taxonomy, feeds, now, delay=0, dry_run=True,
+        fetcher=lambda url, **kw: Response(url=url, status=200, text=document),
+    )
+
+    report = result["feeds"][0]
+    assert report["excluded"] == 1
+    assert [row["excluded_by"] for row in report["sample"]] == ["taiex", None]

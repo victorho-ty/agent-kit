@@ -4,20 +4,20 @@ from __future__ import annotations
 
 import pytest
 
-from news_monitor import discover
+from news_monitor import gate
 from news_monitor.errors import CandidateError
 
 GATE = {"min_items": 3, "max_age_days": 30, "min_finance_hits": 3}
 
 
 def _probe(url, taxonomy, fetcher, routes):
-    return discover.probe(url, taxonomy, fetcher=lambda u: fetcher(routes)(u))
+    return gate.probe(url, taxonomy, fetcher=lambda u: fetcher(routes)(u))
 
 
 def test_a_live_finance_feed_passes_and_is_enabled(taxonomy, fetcher, now):
     result = _probe("https://wire.example.com/rss", taxonomy, fetcher,
                     {"https://wire.example.com/rss": "rss20.xml"})
-    verdict = discover.judge(result, now, GATE)
+    verdict = gate.judge(result, now, GATE)
 
     assert verdict.passed
     assert verdict.enable
@@ -41,7 +41,7 @@ def test_an_unreachable_url_is_rejected_outright(taxonomy, fetcher):
 def test_an_off_topic_feed_is_stored_but_held_back(taxonomy, fetcher, now):
     result = _probe("https://delta.example.org/rss", taxonomy, fetcher,
                     {"https://delta.example.org/rss": "hobby.xml"})
-    verdict = discover.judge(result, now, GATE)
+    verdict = gate.judge(result, now, GATE)
 
     assert not verdict.enable
     assert verdict.reason == "off_topic"
@@ -52,7 +52,7 @@ def test_an_off_topic_feed_is_stored_but_held_back(taxonomy, fetcher, now):
 def test_a_feed_whose_newest_story_is_years_old_is_stale(taxonomy, fetcher, now):
     result = _probe("https://epsilon.example.com/rss", taxonomy, fetcher,
                     {"https://epsilon.example.com/rss": "abandoned.xml"})
-    verdict = discover.judge(result, now, GATE)
+    verdict = gate.judge(result, now, GATE)
 
     assert not verdict.enable
     assert verdict.reason == "stale"
@@ -61,7 +61,7 @@ def test_a_feed_whose_newest_story_is_years_old_is_stale(taxonomy, fetcher, now)
 def test_a_thin_feed_is_held_back(taxonomy, fetcher, now):
     result = _probe("https://wire.example.com/rss", taxonomy, fetcher,
                     {"https://wire.example.com/rss": "rss20.xml"})
-    verdict = discover.judge(result, now, {**GATE, "min_items": 10})
+    verdict = gate.judge(result, now, {**GATE, "min_items": 10})
 
     assert verdict.reason == "thin"
 
@@ -81,19 +81,19 @@ def test_undated_items_are_not_called_stale(taxonomy, fetcher, now):
     )
     from news_monitor.fetch import Response
 
-    result = discover.probe(
+    result = gate.probe(
         "https://u.example/rss", taxonomy,
         fetcher=lambda url: Response(url=url, status=200, text=document),
     )
-    assert discover.judge(result, now, GATE).passed
+    assert gate.judge(result, now, GATE).passed
 
 
 def test_slug_drops_the_feed_boilerplate():
-    assert discover.slugify("Reuters Business News RSS", "reuters.com") == "reuters-business"
-    assert discover.slugify("", "feeds.example.com") == "feeds-example-com"
+    assert gate.slugify("Reuters Business News RSS", "reuters.com") == "reuters-business"
+    assert gate.slugify("", "feeds.example.com") == "feeds-example-com"
 
 
 def test_unique_name_suffixes_rather_than_colliding():
-    assert discover.unique_name("reuters", {"reuters"}) == "reuters-2"
-    assert discover.unique_name("reuters", {"reuters", "reuters-2"}) == "reuters-3"
-    assert discover.unique_name("reuters", set()) == "reuters"
+    assert gate.unique_name("reuters", {"reuters"}) == "reuters-2"
+    assert gate.unique_name("reuters", {"reuters", "reuters-2"}) == "reuters-3"
+    assert gate.unique_name("reuters", set()) == "reuters"

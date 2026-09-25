@@ -1,10 +1,10 @@
 """SQLite: which feeds exist, what they published, and what has gone out.
 
-Four tables, four jobs:
+Three tables, three jobs:
 
 * **feed** -- the source list *and* its fetch health, in one table on purpose.
   Every sibling bundle keeps what-is-watched in a JSON file and the health in
-  the database; this one cannot, because discovery adds sources at run time and
+  the database; this one cannot, because ``add`` writes sources at run time and
   a file the tools also wrote would be a second truth that drifts. ``enabled``
   is a column here rather than a key in a file for exactly that reason.
 * **item** -- every headline ever seen. ``reported_at`` doubles as the ledger,
@@ -12,12 +12,9 @@ Four tables, four jobs:
   not been stamped.
 * **runs** -- one row per check including the failures, which is the agent's
   whole triage surface. It never parses stdout.
-* **meta** -- two or three scalars that belong to the installation rather than
-  to any feed. Today: when the agent was last asked to go looking for sources.
 
 Nothing is ever deleted. A feed that has gone bad is disabled, not dropped --
-dropping it would let discovery re-find it a week later and re-seed its back
-catalogue as news.
+its items still name it, and its row keeps the record of why it went quiet.
 """
 
 from __future__ import annotations
@@ -38,7 +35,7 @@ CREATE TABLE IF NOT EXISTS feed (
   category              TEXT NOT NULL DEFAULT 'general',
   note                  TEXT,
   enabled               INTEGER NOT NULL DEFAULT 1,
-  origin                TEXT NOT NULL DEFAULT 'seed',    -- seed | discovered
+  origin                TEXT NOT NULL DEFAULT 'seed',    -- seed | added
   gate_verdict          TEXT,                            -- pass, or why it was held back
   gate_detail           TEXT,
   added_at              TEXT NOT NULL,
@@ -84,14 +81,7 @@ CREATE TABLE IF NOT EXISTS runs (
   errors         INTEGER NOT NULL DEFAULT 0,
   detail         TEXT
 );
-
-CREATE TABLE IF NOT EXISTS meta (
-  key    TEXT PRIMARY KEY,
-  value  TEXT
-);
 """
-
-LAST_DISCOVERY_KEY = "last_discovery_prompt_at"
 
 
 def connect(path: Path | str | None = None) -> sqlite3.Connection:
@@ -113,23 +103,6 @@ def connect(path: Path | str | None = None) -> sqlite3.Connection:
             f"could not open the database at {resolved}: {exc}", path=str(resolved)
         ) from exc
     return conn
-
-
-# --------------------------------------------------------------------------- meta
-
-
-def meta_get(conn: sqlite3.Connection, key: str) -> str | None:
-    row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
-    return row["value"] if row else None
-
-
-def meta_set(conn: sqlite3.Connection, key: str, value: str) -> None:
-    conn.execute(
-        "INSERT INTO meta (key, value) VALUES (?, ?) "
-        "ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-        (key, value),
-    )
-    conn.commit()
 
 
 # --------------------------------------------------------------------------- feeds
@@ -226,10 +199,6 @@ def set_enabled(conn: sqlite3.Connection, name: str, enabled: bool, now: datetim
     )
     conn.commit()
     return bool(cursor.rowcount)
-
-
-def tracked_urls(conn: sqlite3.Connection) -> list[str]:
-    return [row["url"] for row in conn.execute("SELECT url FROM feed ORDER BY url").fetchall()]
 
 
 def record_feed_success(

@@ -1,7 +1,7 @@
 """The feeds an empty database starts with.
 
 This is a bootstrap, not a config. Once a feed is a row it is edited as a row,
-because discovery writes rows at run time and a file the tools also wrote would
+because ``add`` writes rows at run time and a file the tools also wrote would
 be a second truth that drifts. Re-running against a populated database inserts
 nothing.
 """

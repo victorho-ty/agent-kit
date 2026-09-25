@@ -30,17 +30,29 @@ def _pattern(term: str) -> re.Pattern:
     return re.compile(f"{left}{escaped}{right}", re.IGNORECASE)
 
 
+def _prefix_pattern(term: str) -> re.Pattern:
+    """A boundary on the left only, so the term also matches as a word stem.
+
+    For exclusion that is the point: "Taiwan" must also drop "Taiwanese" and
+    "Australia" must also drop "Australian dollar", or the list needs every
+    adjective spelled out and still leaks the one nobody thought of.
+    """
+    left = r"\b" if term[:1].isalnum() else ""
+    return re.compile(f"{left}{re.escape(term)}", re.IGNORECASE)
+
+
 def _compile(mapping: dict[str, list[str]]) -> dict[str, list[re.Pattern]]:
     return {key: [_pattern(term) for term in terms if term] for key, terms in mapping.items()}
 
 
 @dataclasses.dataclass(frozen=True)
 class Taxonomy:
-    """Sector buckets, event signals, and the finance vocabulary for the gate."""
+    """Sector buckets, event signals, the gate's vocabulary, and the drop list."""
 
     sectors: dict[str, list[re.Pattern]]
     signals: dict[str, list[re.Pattern]]
-    finance_terms: list[re.Pattern]
+    finance_terms: list[tuple[str, re.Pattern]]
+    exclude: list[tuple[str, re.Pattern]]
     path: Path
 
     def match_groups(self, text: str, groups: dict[str, list[re.Pattern]]) -> list[str]:
@@ -48,7 +60,14 @@ class Taxonomy:
 
     def finance_hits(self, text: str) -> list[str]:
         """Distinct finance terms present. The count is the gate; the list is why."""
-        return [p.pattern.strip("\\b") for p in self.finance_terms if p.search(text)]
+        return [term for term, pattern in self.finance_terms if pattern.search(text)]
+
+    def excluded_by(self, text: str) -> str | None:
+        """The exclude term ``text`` matches, or ``None`` if it may be kept."""
+        for term, pattern in self.exclude:
+            if pattern.search(text):
+                return term
+        return None
 
 
 def load_taxonomy(path: Path | str | None = None) -> Taxonomy:
@@ -70,6 +89,8 @@ def load_taxonomy(path: Path | str | None = None) -> Taxonomy:
     return Taxonomy(
         sectors=_compile(raw["sectors"]),
         signals=_compile(raw["signals"]),
-        finance_terms=[_pattern(term) for term in raw["finance_terms"] if term],
+        finance_terms=[(term, _pattern(term)) for term in raw["finance_terms"] if term],
+        # Optional: an empty drop list is a valid choice, not a broken file.
+        exclude=[(term, _prefix_pattern(term)) for term in raw.get("exclude", []) if term],
         path=path,
     )

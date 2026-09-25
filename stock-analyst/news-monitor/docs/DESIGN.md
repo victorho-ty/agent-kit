@@ -8,7 +8,7 @@ Every sibling bundle (`news-radar`, `video-summary`, `stock-desk`) keeps
 what-it-watches in a package-data JSON file and its fetch health in SQLite. This
 one merges them into one `feed` table.
 
-The reason is discovery. Sources are added at run time by the agent, so a JSON
+The reason is `add`. The operator can add a source at any time, so a JSON
 file would have to be written by the tools — and a file that is both shipped
 package data and mutable runtime state drifts within a week: an upgrade
 overwrites it, a hand edit collides with a write, and `enabled` ends up meaning
@@ -69,35 +69,34 @@ tool reports the past.
 `seeded_feeds` is in every payload so the silence is never mistaken for a broken
 feed.
 
-## Discovery: the agent searches, the code refuses to believe it
+## No self-discovery: sources are added on the operator's request
 
-Deciding whether a feed is "useful for capital-markets trading" is judgement,
-and no expression turns that into Python. So the search is the agent's — and
-every url it comes back with is fetched, parsed and measured before it becomes a
-row.
+The first version asked the agent to search the web for new finance feeds on
+every run: `check` carried a `discovery` block with `due` and the list of
+tracked urls, and a `meta` table timed the prompts. That was removed at the
+operator's direction. The source list is a decision about what the desk reads,
+and it is theirs — an agent adding sources on its own initiative changes the
+desk's inputs without anyone having chosen to.
 
-The split matters in both directions. The agent cannot add a parked domain or an
-HTML page, because those fail outright. The *code* cannot silently reject a good
-feed, because a candidate that is a real feed is always stored — failing the
-quality tests means `enabled: false` with the reason on the row, one `enable`
-away from live.
+What remains is the mechanism, not the initiative:
 
-Nothing is discarded, which is deliberate: a dropped url is re-proposed by the
-next sweep, forever.
+- `seeds.json` bootstraps the table, as before.
+- `add` exists for a source the operator asks for, and is the only way a row is
+  created after the first run. `SKILL.md` forbids running it unasked, and
+  `check` no longer gives the agent any prompt to.
+- Rows created by `add` carry `origin: added`. Rows written by the first
+  version say `discovered`; nothing reads the value, so they were left alone.
 
-`discovery.tracked_urls` ships in every `check` payload for the same reason. It
-is the only thing stopping a sweep from re-proposing the five seeded feeds every
-hour.
+The gate stays exactly as it was, because the reason for it does not depend on
+who picked the source: a url someone typed can still be an HTML page, a parked
+domain or a mistyped path. The agent cannot add one of those, because they fail
+outright. And the code cannot silently refuse what the operator asked for: a
+candidate that is a real feed is always stored — failing the quality tests
+means `enabled: false` with the reason on the row, reported back, one `enable`
+away from live if the operator disagrees.
 
-### The interval stamp
-
-`last_discovery_prompt_at` is written when the agent is *asked* to sweep, not
-when it finds something. Stamping on success would make any interval above zero
-fire every run until a feed was found — which, for a well-covered database, is
-never.
-
-Default interval is 0: every run, as specified. The knob exists so it can be
-dialled back without a code change.
+The module that does this is `gate.py`. It was `discover.py` while the agent
+searched; the old name described a job the bundle no longer does.
 
 ## The gate is crude on purpose
 
@@ -137,9 +136,9 @@ BLS was seeded on the strength of that finding and then removed, because
 requiring an email address to run the bundle out of the box is a poor trade for
 one feed. Nothing in the seeded list needs the knob now.
 
-The knob stays, and is not scaffolding: the source list grows at run time, and
-the statistical agencies are exactly what a sweep should find. Without it a
-`.gov` feed added later fails with an opaque 403 and no remedy — the agent would
+The knob stays, and is not scaffolding: the operator can `add` a government
+source at any time — three US ones are seeded already, none of which currently
+check. Without it a `.gov` feed added later fails with an opaque 403 and no remedy — the agent would
 see `unreachable`, conclude the url was wrong, and disable a working source.
 With it, the triage path is one hop, and both `SKILL.md` and
 `references/sources.md` name a `.gov` 403 as this.
@@ -156,8 +155,8 @@ would put someone else's address on requests they did not make.
 - **No clustering.** `news-radar` clusters because it builds a digest across
   outlets. This hands over items; grouping them is the agent's job and it has
   the category and the hints to do it.
-- **No delete.** Sources are disabled. A deleted row is re-discovered and
-  re-seeded as news.
+- **No delete.** Sources are disabled. The row keeps the record of why a source
+  went quiet, and its items still name it.
 - **No per-feed throttle.** `news-radar` has one because it mixes hourly wires
   with quarterly sources. Every feed here is a wire on an hourly cron, and
   conditional GET already makes an unchanged feed nearly free.

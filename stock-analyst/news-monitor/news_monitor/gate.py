@@ -1,18 +1,17 @@
-"""Deciding whether a url somebody offered is a finance feed worth turning on.
+"""Deciding whether a url the operator asked for is a finance feed worth turning on.
 
-Discovery itself is the agent's job -- searching the web is judgement, and no
-amount of Python turns "is this useful for capital-markets trading" into an
-expression. What Python *can* do is refuse to take the agent's word for it, and
-that is this module: every candidate is fetched, parsed and measured before it
-becomes a row.
+Only ``news-monitor add`` reaches this module, and only when the operator has
+asked for a source: nothing in this bundle goes looking for feeds. Which source
+to add is the operator's call. Whether the url they handed over is actually a
+live feed is not something anyone should take on trust, and that is this
+module: every candidate is fetched, parsed and measured before it becomes a row.
 
 The gate, in order. The first three decide whether there is a feed at all; the
 last three decide whether it goes live:
 
 1. **already tracked** -- the url, normalised, is in the ``feed`` table. Not an
-   insert and not an error the agent should retry: it is the expected answer
-   most of the time, and the whole reason the tracked list ships in every
-   ``check`` payload.
+   insert and not an error the agent should retry: the answer is to tell the
+   operator which existing feed it already is.
 2. **unreachable** -- the fetch failed after its retries. Rejected outright.
 3. **not a feed** -- the document is not XML, or is XML with no items in it.
    Rejected outright. This is what catches an HTML page, a parked domain, a
@@ -29,9 +28,10 @@ last three decide whether it goes live:
    dropping it. A feed the gate was wrong about is one ``enable`` away.
 
 A candidate that reaches step 4 is always stored. Passing means enabled;
-failing 4, 5 or 6 means enabled = 0 with the reason on the row, waiting for a
-human or an agent to look. Nothing is silently discarded, because a discarded
-url would be re-proposed by the next sweep forever.
+failing 4, 5 or 6 means enabled = 0 with the reason on the row, waiting for the
+operator to decide. Nothing is silently discarded: the operator asked for
+this url, and a held-back row keeps both the request and the reason in one
+place.
 """
 
 from __future__ import annotations

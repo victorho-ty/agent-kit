@@ -2,8 +2,9 @@
 //
 // This file is NOT the source of truth. The `feed` table is: once a feed is in
 // the database it is edited there -- `news-monitor enable|disable`, and
-// `news-monitor add` for new ones -- because discovery writes rows at run time
-// and a JSON file the tools also write would be two truths that drift.
+// `news-monitor add` for new ones, on the operator's request -- because `add`
+// writes rows at run time and a JSON file the tools also wrote would be two
+// truths that drift.
 //
 // Editing a url here after first run changes nothing. Add the new url with
 // `news-monitor add` and disable the old row.
@@ -16,6 +17,12 @@
       "note": "Every Fed press release: FOMC statements, minutes, speeches, enforcement, regulatory."
     },
     {
+      "name": "hkma",
+      "url": "https://www.hkma.gov.hk/eng/other-information/rss/rss_press-release.xml",
+      "category": "central-bank",
+      "note": "Hong Kong Monetary Authority."
+    },
+    {
       "name": "dj-markets",
       "url": "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain",
       "category": "markets",
@@ -26,6 +33,18 @@
       "url": "https://www.cnbc.com/id/20910258/device/rss/rss.html",
       "category": "markets",
       "note": "CNBC finance."
+    },
+    {
+      "name": "us-bureau-of-economic-analysis",
+      "url": "https://apps.bea.gov/rss/rss.xml",
+      "category": "economic-data",
+      "note": "Bureau of Economic Analysis."
+    },
+    {
+      "name": "us-sec",
+      "url": "https://www.sec.gov/news/pressreleases.rss",
+      "category": "regulatory",
+      "note": "US Securities and Exchange Commission."
     }
   ]
 }

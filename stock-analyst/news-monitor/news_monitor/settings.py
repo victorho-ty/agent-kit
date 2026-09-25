@@ -1,8 +1,8 @@
 """Runtime configuration, all overridable by environment variable.
 
 *What* is watched is not here, and it is not in a file either -- it is the
-``feed`` table, because discovery adds sources at run time and a config file the
-tools also write would be a second truth that drifts. ``config/seeds.json`` only
+``feed`` table, because ``add`` writes sources at run time and a config file the
+tools also wrote would be a second truth that drifts. ``config/seeds.json`` only
 bootstraps an empty database.
 
 **Paths are scoped to the profile, not to the bundle.** State lives under
@@ -39,14 +39,8 @@ DEFAULT_MAX_PER_CHECK = 40
 # article, and the whole point of the link is that the article is elsewhere.
 DEFAULT_SUMMARY_CHAR_CAP = 600
 
-# How often the agent is asked to go looking for new feeds. Zero means every
-# run, which is the configured default. Raise it if the search is costing more
-# than it finds -- `check` reports `discovery.due` and the agent skips the sweep
-# entirely when it is false.
-DEFAULT_DISCOVERY_INTERVAL_HOURS = 0
-
-# The gate a discovered feed must clear to be enabled without review.
-# See discover.py for what each one actually rejects.
+# The gate a feed offered to `add` must clear to be enabled without review.
+# See gate.py for what each one actually rejects.
 DEFAULT_GATE_MIN_ITEMS = 3
 DEFAULT_GATE_MAX_AGE_DAYS = 30
 DEFAULT_GATE_MIN_FINANCE_HITS = 3
@@ -87,8 +81,8 @@ def request_delay() -> float:
 def contact() -> str | None:
     """A contact address to put in the User-Agent, or ``None``.
 
-    Optional, and nothing seeded needs it. It exists because the source list
-    grows at run time: US government data hosts publish an access policy
+    Optional, and nothing seeded needs it. It exists because the operator can
+    ``add`` a source at any time: US government data hosts publish an access policy
     requiring an identifiable requester, and **bls.gov answers 403 to any
     User-Agent with no email address in it** -- including a browser's -- while
     serving the feed immediately with one. Measured, not assumed.
@@ -113,12 +107,6 @@ def max_per_check() -> int:
 
 def summary_char_cap() -> int:
     return int(os.environ.get("NEWS_MONITOR_SUMMARY_CAP", DEFAULT_SUMMARY_CHAR_CAP))
-
-
-def discovery_interval_hours() -> float:
-    return float(
-        os.environ.get("NEWS_MONITOR_DISCOVERY_HOURS", DEFAULT_DISCOVERY_INTERVAL_HOURS)
-    )
 
 
 def gate() -> dict:

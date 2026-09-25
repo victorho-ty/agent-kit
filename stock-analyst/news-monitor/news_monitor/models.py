@@ -44,7 +44,7 @@ class Feed:
     category: str
     note: str | None
     enabled: bool
-    origin: str           # seed | discovered
+    origin: str           # seed | added
     gate_verdict: str | None
     added_at: str
     last_check_at: str | None = None

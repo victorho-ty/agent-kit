@@ -22,7 +22,7 @@ collected and the run finishes ``partial``.
 from __future__ import annotations
 
 import time as _time
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from . import db, fetch, settings
 from . import feed as feed_parser
@@ -52,7 +52,7 @@ def check(
     reports: list[dict] = []
     failures: list[dict] = []
     seeded_feeds: list[dict] = []
-    entries_seen = items_new = 0
+    entries_seen = items_new = items_excluded = 0
 
     for index, feed in enumerate(feeds):
         if index and delay:
@@ -68,6 +68,7 @@ def check(
         # is stored pre-stamped, and a run row saying 0 would read as a feed
         # that returned nothing.
         items_new += report.get("new", 0) + report.get("absorbed", 0)
+        items_excluded += report.get("excluded", 0)
         if report["status"] == "error":
             failures.append({"feed": feed.name, "error": report["error"]})
         if report.get("absorbed"):
@@ -101,8 +102,11 @@ def check(
         "feeds": reports,
         "feed_failures": failures,
         "seeded_feeds": seeded_feeds,
+        # Entries in this run's documents that matched the exclude list. Not
+        # stored, so the same story is counted again on every run that
+        # re-fetches its feed -- a 304 does not re-count it.
+        "excluded": items_excluded,
         "items": items,
-        "discovery": _discovery_block(conn, now, dry_run=dry_run),
         **db.pending_count(conn),
     }
 
@@ -148,15 +152,26 @@ def _check_one(conn, taxonomy, feed, now, *, run_id, seed, dry_run, fetcher) -> 
             "status": "ok",
             "entries": len(entries),
             "new": 0,
+            "excluded": sum(1 for entry in entries if _excluded_by(entry, taxonomy)),
             "sample": [
-                {"title": entry.title, "url": entry.url, "published_text": entry.published_text}
+                {
+                    "title": entry.title,
+                    "url": entry.url,
+                    "published_text": entry.published_text,
+                    "excluded_by": _excluded_by(entry, taxonomy),
+                }
                 for entry in entries[:5]
             ],
         }
 
     absorbing = seed or not feed.seeded
-    new = 0
+    new = excluded = 0
     for entry in entries:
+        # Dropped before the insert: no row, no ledger entry, no way to be
+        # returned. The house pattern from video-summary.
+        if _excluded_by(entry, taxonomy):
+            excluded += 1
+            continue
         sectors, signals = classify(entry.title, entry.summary, taxonomy)
         inserted = db.insert_item(
             conn, entry,
@@ -177,10 +192,15 @@ def _check_one(conn, taxonomy, feed, now, *, run_id, seed, dry_run, fetcher) -> 
         "status": _yield_status(feed, entries),
         "entries": len(entries),
         "new": 0 if absorbing else new,
+        "excluded": excluded,
     }
     if absorbing:
         report["absorbed"] = new
     return report
+
+
+def _excluded_by(entry, taxonomy: Taxonomy) -> str | None:
+    return taxonomy.excluded_by(f"{entry.title}\n{entry.summary or ''}")
 
 
 def _yield_status(feed, entries) -> str:
@@ -195,37 +215,3 @@ def _yield_status(feed, entries) -> str:
         return "zero_yield"
     return "ok"
 
-
-def _discovery_block(conn, now: datetime, *, dry_run: bool) -> dict:
-    """Whether the agent should go looking for new feeds, and what it already has.
-
-    The tracked url list ships on every run on purpose: it is what stops a sweep
-    proposing the five feeds already in the database, every hour, forever.
-    """
-    interval = settings.discovery_interval_hours()
-    last_raw = db.meta_get(conn, db.LAST_DISCOVERY_KEY)
-    last = _parse_stamp(last_raw, now)
-    due = interval <= 0 or last is None or (now - last) >= timedelta(hours=interval)
-
-    if due and not dry_run:
-        # Stamped on being asked, not on finding something. A sweep that turned
-        # up nothing is still a sweep, and without this an interval longer than
-        # zero would fire every run until something was found.
-        db.meta_set(conn, db.LAST_DISCOVERY_KEY, now.isoformat())
-
-    return {
-        "due": due,
-        "interval_hours": interval,
-        "last_prompted_at": last_raw,
-        "tracked_urls": db.tracked_urls(conn),
-    }
-
-
-def _parse_stamp(value: str | None, now: datetime) -> datetime | None:
-    if not value:
-        return None
-    try:
-        parsed = datetime.fromisoformat(value)
-    except ValueError:
-        return None
-    return parsed.replace(tzinfo=now.tzinfo) if parsed.tzinfo is None else parsed

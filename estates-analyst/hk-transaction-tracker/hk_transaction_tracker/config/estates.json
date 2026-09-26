@@ -59,6 +59,24 @@
       "enabled": true
     },
     {
+      "name": "三匯大廈",
+      "label": "三匯大廈",
+      "url": "https://hk.centanet.com/findproperty/list/transaction/%E4%B8%89%E5%8C%AF%E5%A4%A7%E5%BB%88_2-SSYSPPPYPG?q=06xhhezgeojbr",
+      "bedrooms": [],
+      "size_ranges": [[200, 800]],
+      "track": ["sale", "rental"],
+      "enabled": true
+    },
+    {
+      "name": "惠民樓",
+      "label": "惠民樓",
+      "url": "https://hk.centanet.com/findproperty/list/transaction/%E6%83%A0%E6%B0%91%E6%A8%93_2-OQDCFRVXRO",
+      "bedrooms": [],
+      "size_ranges": [[200, 800]],
+      "track": ["sale", "rental"],
+      "enabled": true
+    },
+    {
       "name": "CaymanRise",
       "label": "CaymanRise",
       "url": "https://hk.centanet.com/findproperty/list/transaction/%E5%8A%A0%E6%83%A0%E8%87%BA_2-SSPPWPPEPS",

@@ -5,7 +5,8 @@ table at the bottom. The only exception is `pending --count`, which prints a
 bare integer.
 
 Nothing here updates or deletes a stored transaction. `check` appends,
-`report --commit` stamps the delivery ledger, and everything else is a read.
+`report --commit` stamps the delivery ledger, `exclude` and `include` set and
+clear one flag on an existing row, and everything else is a read.
 
 ---
 
@@ -109,6 +110,7 @@ The grouped summary of everything matched and not yet delivered.
   "new_count": 18,
   "pending_total": 18,
   "held_back": 0,
+  "excluded_pending": 1,
   "groups": [
     {
       "deal_type": "sale",
@@ -204,17 +206,20 @@ Past numbers for one estate on one side of the market. Read-only.
   "deal_type": "sale",
   "deal_label": "買賣",
   "archive": {"estate": "泓都", "deal_type": "sale", "total": 64, "priced": 63,
-              "earliest": "2025-09-25", "latest": "2026-08-17"},
+              "excluded": 0, "earliest": "2025-09-25", "latest": "2026-08-17"},
+  "excluded": 0,
   "trend": { /* as below */ },
   "trend_line": "泓都 Island Harbourview · 買賣 呎價(實)：近90日中位數 …",
   "monthly": [{"month": "2025-10", "median_unit_price": 18444.5, "samples": 4}],
-  "transactions": [ /* the same item shape as `report`, each with a `line` */ ],
+  "transactions": [ /* the same item shape as `report`, each with a `line`;
+                       flagged rows are included and marked */ ],
   "images": []
 }
 ```
 
 `archive.earliest` is where the archive begins, not where the estate's history
-begins. There is nothing behind it.
+begins. There is nothing behind it. `total`, `priced` and the span cover what the
+statistics cover; `excluded` counts the flagged rows they leave out.
 
 ---
 
@@ -246,6 +251,7 @@ begins. There is nothing behind it.
       "pct": -1.23,
       "direction": "down",
       "basis": "ok",
+      "excluded": 1,
       "archive": {"transactions": 63, "priced": 63,
                   "earliest": "2025-09-25", "latest": "2026-08-17"}
     }
@@ -260,7 +266,10 @@ begins. There is nothing behind it.
 - `direction` — `up`, `down`, `flat`, or `none` when there is no comparison.
   **`flat` and `none` are different answers.**
 - Every figure is a median of 呎價(實) across **all** residential transactions in
-  the estate, matched or not.
+  the estate, matched or not — and never across a transaction flagged out with
+  `hk-tx exclude`. `excluded` is how many flagged rows stand behind the bucket:
+  reported, never silent, and outside `transactions`, `priced`, the archive span
+  and every sample count.
 
 ---
 
@@ -275,10 +284,55 @@ The archive, filtered. Read-only.
 | `--since ISO` / `--until ISO` | on 成交日期 |
 | `--bedrooms N` | exact 間隔 |
 | `--all` | include transactions that failed the entry's criteria |
+| `--no-excluded` | hide transactions flagged out of the statistics |
 | `--limit N` | default 30 |
 
-Returns `count`, the `filters` applied, and `transactions` in the same item
-shape as `report`.
+Returns `count`, `excluded_shown`, the `filters` applied, and `transactions` in
+the same item shape as `report`. Flagged rows are **listed, marked**, by default:
+"did anything else sell there" is a question about the archive, not about the
+statistics, and a row that silently vanishes reads as a bug.
+
+---
+
+## `hk-tx exclude` / `hk-tx include` / `hk-tx exclusions`
+
+`exclude` takes a stored transaction out of every median, average, percentage
+and chart point. `include` puts it back. `exclusions` lists what is flagged.
+These are the only commands that write to a row, and the only field they touch is
+the flag; nothing is deleted and no figure is recomputed.
+
+| command | option | meaning |
+|---|---|---|
+| `exclude` | `TX_ID` (required) | Centanet's own id, as stored |
+| | `--estate NAME` | the config name, when the id is ambiguous |
+| | `--reason TEXT` | why it is out; kept with the record and shown on its line |
+| `include` | `TX_ID`, `--estate NAME` | clears the flag |
+| `exclusions` | `--estate NAME` | limit the list to one estate |
+
+```json
+{
+  "ok": true,
+  "action": "exclude",
+  "tx_id": "24031400950010",
+  "reason": "疑非市價成交",
+  "changed": 1,
+  "already_excluded": false,
+  "excluded_total": 1,
+  "rows": [ /* the row as it now stands, with `excluded_mark` and `line` */ ]
+}
+```
+
+- The reason is shown on the transaction's line wherever it is announced:
+  `…　$2,890/呎　〔不計入統計：疑非市價成交〕`.
+- **The first reason sticks.** Re-excluding an already-flagged row changes
+  nothing (`changed: 0`, `already_excluded: true`); to change the wording, run
+  `include` and then `exclude` again with the new one.
+- `changed: 0` with rows returned means "already in that state", which is not an
+  error. A `tx_id` the archive has never seen is `ERR_NOT_FOUND` (exit 30) —
+  the archive only holds what a check has already fetched, so check the estate
+  first.
+- `exclusions` returns `count` and the `excluded` records oldest first, each with
+  its unit, price, 呎價 and reason.
 
 ---
 
@@ -308,7 +362,7 @@ Validate the config and show each entry's criteria, state and archive.
       "enabled": true,
       "state": {"seeded": 1, "last_ok_at": "…", "consecutive_failures": 0,
                 "recent_yield": 93, "published_count": 286, "last_error": null},
-      "archive": [{"deal_type": "sale", "total": 64, "priced": 63,
+      "archive": [{"deal_type": "sale", "total": 64, "priced": 63, "excluded": 1,
                    "earliest": "2025-09-25", "latest": "2026-08-17"}]
     }
   ]

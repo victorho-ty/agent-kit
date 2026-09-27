@@ -10,7 +10,9 @@ Three tables, three jobs:
   ``reported_at`` doubles as the delivery ledger, so there is no second table to
   keep in sync: a transaction is pending when it matched and has not been
   stamped. A missed day therefore needs no catch-up, and a summary that failed
-  to send is still pending tomorrow.
+  to send is still pending tomorrow. ``excluded_at`` is the one field a later
+  command may write: a flagged row stays in the archive and is still announced,
+  but no median, average, percentage or chart point ever sees it.
 * **runs** -- one row per check including the failures, which is the agent's
   whole triage surface. It never parses stdout to find out what happened.
 
@@ -20,9 +22,10 @@ two-bedroom flats somebody asked to be told about -- because a median over the
 handful of transactions matching a narrow filter is noise, not a market level.
 Storing only the matches would make the trend unrecoverable after the fact.
 
-Nothing here ever deletes or rewrites a transaction. The newest hundred records
-are all Centanet will serve and there is no way to page behind them, so a row
-that scrolls out of that window survives in this file or nowhere.
+Nothing here ever deletes a transaction row, and nothing rewrites one except the
+exclusion flag. The newest hundred records are all Centanet will serve and there
+is no way to page behind them, so a row that scrolls out of that window survives
+in this file or nowhere.
 """
 
 from __future__ import annotations
@@ -76,6 +79,8 @@ CREATE TABLE IF NOT EXISTS transaction_row (
   first_seen_at        TEXT NOT NULL,
   reported_at          TEXT,                          -- the ledger; NULL means pending
   run_id               INTEGER,
+  excluded_at          TEXT,                          -- flagged out of every median and average
+  excluded_reason      TEXT,                          -- why, kept with the record
   UNIQUE (estate, tx_id)
 );
 
@@ -97,6 +102,24 @@ CREATE TABLE IF NOT EXISTS runs (
 """
 
 
+# Columns added after the first archives were written. ``CREATE TABLE IF NOT
+# EXISTS`` never touches a table that already exists, so an archive written by an
+# older build needs the ALTER or every exclusion query fails on a missing column.
+ADDED_COLUMNS = (
+    ("excluded_at", "TEXT"),
+    ("excluded_reason", "TEXT"),
+)
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Bring an existing archive up to the current schema. Additive only."""
+    have = {row["name"] for row in conn.execute("PRAGMA table_info(transaction_row)")}
+    for column, ddl in ADDED_COLUMNS:
+        if column not in have:
+            conn.execute(f"ALTER TABLE transaction_row ADD COLUMN {column} {ddl}")
+    conn.commit()
+
+
 def connect(path: Path | str | None = None) -> sqlite3.Connection:
     path = Path(path) if path is not None else settings.db_path()
     try:
@@ -104,6 +127,7 @@ def connect(path: Path | str | None = None) -> sqlite3.Connection:
         conn = sqlite3.connect(path)
         conn.row_factory = sqlite3.Row
         conn.executescript(SCHEMA)
+        _migrate(conn)
     except (OSError, sqlite3.Error) as exc:
         raise DatabaseError(
             f"could not open the transaction archive at {path}: {exc}", path=str(path),
@@ -300,8 +324,16 @@ def query(
     with_unit_price: bool = False,
     limit: int | None = None,
     newest_first: bool = True,
+    include_excluded: bool = False,
 ) -> list[dict]:
-    """The archive, filtered. Read-only, like everything an operator can ask for."""
+    """The archive, filtered. Read-only, like everything an operator can ask for.
+
+    Excluded rows are dropped by default, and that default is the whole safety
+    argument: this is the funnel every median, percentage and chart point comes
+    through, so a caller that has never heard of exclusions still cannot average
+    a flagged deal. Listing commands that want the record shown anyway -- the
+    report, ``history``, ``transactions`` -- ask for it explicitly.
+    """
     clauses: list[str] = []
     params: list = []
     if estate:
@@ -324,6 +356,8 @@ def query(
         params.append(1 if matched else 0)
     if with_unit_price:
         clauses.append("saleable_unit_price IS NOT NULL")
+    if not include_excluded:
+        clauses.append("excluded_at IS NULL")
 
     where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
     order = "DESC" if newest_first else "ASC"
@@ -334,12 +368,109 @@ def query(
     return [dict(row) for row in conn.execute(sql, params).fetchall()]
 
 
+# ------------------------------------------------------------------ exclusions
+
+
+def _exclusion_filter(tx_id: str, estate: str | None) -> tuple[str, tuple]:
+    if estate:
+        return "tx_id = ? AND estate = ?", (tx_id, estate)
+    return "tx_id = ?", (tx_id,)
+
+
+def _rows_for(conn: sqlite3.Connection, where: str, params: tuple) -> list[dict]:
+    sql = f"SELECT * FROM transaction_row WHERE {where} ORDER BY estate, ins_date"
+    return [dict(row) for row in conn.execute(sql, params).fetchall()]
+
+
+def set_excluded(
+    conn: sqlite3.Connection,
+    tx_id: str,
+    now: datetime,
+    *,
+    estate: str | None = None,
+    reason: str | None = None,
+) -> tuple[list[dict], int]:
+    """Flag a transaction out of every median, average, percentage and chart.
+
+    The row stays where it is and is still announced when it is new -- it
+    happened, and a record that quietly disappears is worse than one that is
+    marked. Returns the matching rows and how many changed, so the caller can
+    tell "flagged" from "was already flagged" from "no such transaction".
+    """
+    where, params = _exclusion_filter(tx_id, estate)
+    cursor = conn.execute(
+        f"UPDATE transaction_row SET excluded_at = ?, excluded_reason = ? "
+        f"WHERE {where} AND excluded_at IS NULL",
+        (now.isoformat(), (reason or "").strip() or None, *params),
+    )
+    conn.commit()
+    # Read after the write, so the payload shows the state it just set. No rows
+    # means no such transaction; rows with ``rowcount`` 0 means already flagged.
+    return _rows_for(conn, where, params), cursor.rowcount
+
+
+def clear_excluded(
+    conn: sqlite3.Connection, tx_id: str, *, estate: str | None = None
+) -> tuple[list[dict], int]:
+    """Undo an exclusion. The row and its history are untouched either way."""
+    where, params = _exclusion_filter(tx_id, estate)
+    cursor = conn.execute(
+        f"UPDATE transaction_row SET excluded_at = NULL, excluded_reason = NULL "
+        f"WHERE {where} AND excluded_at IS NOT NULL",
+        params,
+    )
+    conn.commit()
+    return _rows_for(conn, where, params), cursor.rowcount
+
+
+def _excluded_filter(estate: str | None, deal_type: str | None) -> tuple[str, tuple]:
+    clauses = ["excluded_at IS NOT NULL"]
+    params: list = []
+    if estate:
+        clauses.append("estate = ?")
+        params.append(estate)
+    if deal_type:
+        clauses.append("deal_type = ?")
+        params.append(deal_type)
+    return " AND ".join(clauses), tuple(params)
+
+
+def excluded(conn: sqlite3.Connection, *, estate: str | None = None) -> list[dict]:
+    """Every flagged transaction, oldest first -- the exclusions as a list.
+
+    Shown with the record's own details rather than as bare ids: an opaque
+    ``tx_id`` on its own says nothing about what was taken out of the statistics.
+    """
+    return _rows_for(conn, *_excluded_filter(estate, None))
+
+
+def excluded_count(
+    conn: sqlite3.Connection, *, estate: str | None = None, deal_type: str | None = None
+) -> int:
+    """How many flagged rows stand behind a bucket -- reported, never silent."""
+    where, params = _excluded_filter(estate, deal_type)
+    return conn.execute(
+        f"SELECT COUNT(*) FROM transaction_row WHERE {where}", params
+    ).fetchone()[0]
+
+
 def buckets(conn: sqlite3.Connection) -> list[dict]:
-    """Every (estate, deal_type) pair the archive actually holds, with its span."""
+    """Every (estate, deal_type) pair the archive actually holds, with its span.
+
+    ``total``, ``priced`` and the span all describe what the statistics describe,
+    so ``excluded`` is broken out separately rather than folding into them: an
+    operator asking how much the archive holds is entitled to see both. The span
+    skips flagged rows for the same reason
+    :func:`hk_transaction_tracker.trend.monthly_series` does -- "the history runs
+    to here" must not rest on a record no figure is allowed to use.
+    """
     rows = conn.execute(
-        """SELECT estate, deal_type, COUNT(*) AS total,
-                  SUM(saleable_unit_price IS NOT NULL) AS priced,
-                  MIN(ins_date) AS earliest, MAX(ins_date) AS latest
+        """SELECT estate, deal_type,
+                  SUM(excluded_at IS NULL) AS total,
+                  SUM(excluded_at IS NULL AND saleable_unit_price IS NOT NULL) AS priced,
+                  SUM(excluded_at IS NOT NULL) AS excluded,
+                  MIN(CASE WHEN excluded_at IS NULL THEN ins_date END) AS earliest,
+                  MAX(CASE WHEN excluded_at IS NULL THEN ins_date END) AS latest
              FROM transaction_row
             GROUP BY estate, deal_type
             ORDER BY estate, deal_type"""

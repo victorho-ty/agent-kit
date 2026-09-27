@@ -156,6 +156,34 @@ chat can never consume a pending summary.
 the criteria — that is how you answer "did anything else sell there" and how you
 find out a filter is too tight.
 
+## Taking a record out of the statistics
+
+```bash
+hk-tx exclude <tx_id> --estate <name> --reason "疑非市價成交"   # writes one flag
+hk-tx include <tx_id> --estate <name>                          # puts it back
+hk-tx exclusions [--estate <name>]                             # what is flagged
+```
+
+The operator names the record; you run the command. `exclude` takes it out of
+every median, average, percentage and chart point — permanently, including runs
+that have not happened yet — and `include` re-admits it. The row itself is never
+deleted, is still announced when it is new, and every line that mentions it
+carries 〔不計入統計：<reason>〕.
+
+- **Flag only what the operator names, and say the reason back to them.** Whether
+  a deal is an outlier is a market judgement; this desk reports, it does not
+  decide which prices count.
+- The reason is the operator's words, kept with the record and shown on the line
+  for ever. Ask for it if they did not give one; if they decline, the line reads
+  〔不計入統計〕 with no reason, which is worse but honest.
+- `changed: 0` with rows returned means it was already flagged; a `tx_id` the
+  archive has never seen exits `30 ERR_NOT_FOUND`, because the archive holds only
+  what a check has already fetched.
+- **The first reason sticks.** To reword one, `include` and then `exclude` again.
+- Every payload counts what is flagged — `excluded` on the trend, `excluded`
+  inside `archive` — so a median that dropped a record is never silent. Mention
+  the count when it is not zero and the trend matters to the answer.
+
 **The archive starts where the first check ran.** Centanet serves the newest
 hundred records per estate and honours no offset, so there is no way to page
 behind them: 5 to 12 months on a busy block, longer on a quiet one, and it
@@ -238,6 +266,10 @@ unreadable — check `HK_TX_DB` before anything else, and never start a fresh on
 - Never mix 買賣 and 租賃 figures, and never present a 呎租 as a 呎價.
 - Never estimate the 呎價 of a 面積待補 deal, and never fill in a missing area
   from another unit in the same block.
+- Never exclude a transaction on your own initiative. Flagging a price out of the
+  statistics is the operator's call and the operator's reason; you run the
+  command they name and nothing else. `exclude` and `include` are the only
+  commands that touch a stored row, and they change one flag, never a figure.
 - Never describe what a chart looks like. You have a file path, not a picture;
   everything you say about the direction comes from `trend`.
 - Never read a price move as good or bad, and never call a market hot, cooling,

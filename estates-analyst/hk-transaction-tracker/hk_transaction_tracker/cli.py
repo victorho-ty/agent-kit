@@ -15,9 +15,10 @@ uses, and the reason the daily check costs no tokens::
 Everything before the last line runs on a timer. Only the last line wakes the
 agent, and only on a day something actually transacted.
 
-Nothing here updates or deletes a stored transaction. ``check`` appends,
-``report --commit`` stamps the delivery ledger, and every other command is a
-read.
+Nothing here deletes a stored transaction, and nothing changes one except
+``exclude`` and ``include``, which set and clear a single flag on a row that is
+already there. ``check`` appends, ``report --commit`` stamps the delivery
+ledger, and every other command is a read.
 """
 
 from __future__ import annotations
@@ -170,14 +171,20 @@ def cmd_transactions(args) -> int:
             bedrooms=args.bedrooms,
             matched=None if args.all else True,
             limit=args.limit,
+            include_excluded=not args.no_excluded,
         )
         return _emit({
             "ok": True,
             "count": len(rows),
+            # A flagged deal is listed here marked rather than dropped: "did
+            # anything else sell there" is a question about the archive, not
+            # about the statistics, and a row that vanishes reads as a bug.
+            "excluded_shown": sum(1 for row in rows if row["excluded_at"]),
             "filters": {
                 "estate": args.estate, "deal_type": args.deal,
                 "since": args.since, "until": args.until,
                 "bedrooms": args.bedrooms, "matched_only": not args.all,
+                "excluded_hidden": args.no_excluded,
             },
             "transactions": [report.row_payload(row) for row in rows],
         })
@@ -193,7 +200,8 @@ def cmd_estates(args) -> int:
         held: dict = {}
         for row in db.buckets(conn):
             held.setdefault(row["estate"], []).append({
-                key: row[key] for key in ("deal_type", "total", "priced", "earliest", "latest")
+                key: row[key]
+                for key in ("deal_type", "total", "priced", "excluded", "earliest", "latest")
             })
         return _emit({
             "ok": True,
@@ -229,6 +237,79 @@ def cmd_runs(args) -> int:
             "runs": db.recent_runs(conn, args.limit),
             "consecutive_failures": db.consecutive_failures(conn),
             "pending": db.pending_count(conn),
+        })
+    finally:
+        conn.close()
+
+
+def cmd_exclude(args) -> int:
+    """Take a transaction out of every median, average, percentage and chart.
+
+    Writes, and the only write besides ``include``: one flag on one existing
+    row. Nothing is deleted and no figure is recomputed here -- the next read
+    simply does not see it.
+    """
+    conn = db.connect()
+    try:
+        rows, changed = db.set_excluded(
+            conn, args.tx_id, clock.now(), estate=args.estate, reason=args.reason
+        )
+        if not rows:
+            raise NotFoundError(
+                f"no stored transaction with tx_id {args.tx_id!r}",
+                tx_id=args.tx_id,
+                estate=args.estate,
+                hint="the archive holds only what a check has already fetched -- "
+                     "run a check for the estate first, then flag it",
+            )
+        return _emit({
+            "ok": True,
+            "action": "exclude",
+            "tx_id": args.tx_id,
+            "reason": (args.reason or "").strip() or None,
+            "changed": changed,
+            "already_excluded": changed == 0,
+            "excluded_total": db.excluded_count(conn),
+            "rows": [report.row_payload(row) for row in rows],
+        })
+    finally:
+        conn.close()
+
+
+def cmd_include(args) -> int:
+    """Undo an exclusion. Every median sees the transaction again."""
+    conn = db.connect()
+    try:
+        rows, changed = db.clear_excluded(conn, args.tx_id, estate=args.estate)
+        if not rows:
+            raise NotFoundError(
+                f"no stored transaction with tx_id {args.tx_id!r}",
+                tx_id=args.tx_id,
+                estate=args.estate,
+            )
+        return _emit({
+            "ok": True,
+            "action": "include",
+            "tx_id": args.tx_id,
+            "changed": changed,
+            "already_included": changed == 0,
+            "excluded_total": db.excluded_count(conn),
+            "rows": [report.row_payload(row) for row in rows],
+        })
+    finally:
+        conn.close()
+
+
+def cmd_exclusions(args) -> int:
+    conn = db.connect()
+    try:
+        rows = db.excluded(conn, estate=args.estate)
+        return _emit({
+            "ok": True,
+            "estate": args.estate,
+            "db_path": str(settings.db_path()),
+            "count": len(rows),
+            "excluded": [report.row_payload(row) for row in rows],
         })
     finally:
         conn.close()
@@ -311,8 +392,37 @@ def build_parser() -> argparse.ArgumentParser:
         "--all", action="store_true",
         help="include transactions that did not meet the entry's criteria",
     )
+    transactions_parser.add_argument(
+        "--no-excluded", action="store_true",
+        help="hide transactions flagged out of the statistics (they are listed, "
+             "marked, by default)",
+    )
     transactions_parser.add_argument("--limit", type=_positive, default=30)
     transactions_parser.set_defaults(func=cmd_transactions)
+
+    exclude_parser = subparsers.add_parser(
+        "exclude",
+        help="flag a stored transaction out of every median, average and chart (writes)",
+    )
+    exclude_parser.add_argument("tx_id", help="Centanet's own id, as stored")
+    exclude_parser.add_argument("--estate", help="the config name, if the id is ambiguous")
+    exclude_parser.add_argument(
+        "--reason", help="why it is out -- kept with the record and shown on its line"
+    )
+    exclude_parser.set_defaults(func=cmd_exclude)
+
+    include_parser = subparsers.add_parser(
+        "include", help="undo an exclusion, so the medians see it again (writes)"
+    )
+    include_parser.add_argument("tx_id")
+    include_parser.add_argument("--estate")
+    include_parser.set_defaults(func=cmd_include)
+
+    exclusions_parser = subparsers.add_parser(
+        "exclusions", help="every transaction flagged out of the statistics (read-only)"
+    )
+    exclusions_parser.add_argument("--estate", help="only this estate, by config name")
+    exclusions_parser.set_defaults(func=cmd_exclusions)
 
     estates_parser = subparsers.add_parser(
         "estates", help="validate the config and show each entry's criteria and health"

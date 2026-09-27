@@ -16,6 +16,12 @@ Two things are deliberately kept apart from each other:
 A reader who is shown both and told which is which can hold them at once. A
 reader shown one labelled as the other cannot, which is why every trend line
 names its sample size.
+
+**A flagged deal is announced and never averaged.** ``db.set_excluded`` takes a
+transaction out of every median, average and chart point, but it stays in the
+message with 〔不計入統計〕 and its reason on the line. Deleting it from the
+report would be the quiet version of the same edit, and the operator would have
+no way to see that the record exists at all.
 """
 
 from __future__ import annotations
@@ -45,9 +51,30 @@ def _row_cells(row: dict) -> dict:
     }
 
 
+def exclusion_mark(row: dict) -> str:
+    """The marker on the line of a deal that is not in the statistics.
+
+    A flagged transaction is still announced -- it happened, and the operator
+    flagged it rather than deleting it -- but the line has to say so. A reader
+    who compares it against a trend that does not contain it would otherwise
+    conclude the median is broken. The reason rides along, because the flag is
+    only useful months later if it still says why.
+    """
+    if not row["excluded_at"]:
+        return ""
+    reason = (row["excluded_reason"] or "").strip()
+    return f"〔不計入統計：{reason}〕" if reason else "〔不計入統計〕"
+
+
 def row_payload(row: dict) -> dict:
     """One transaction as the agent sees it. Every field already formatted."""
     deal_type = row["deal_type"]
+    cells = _row_cells(row)
+    mark = exclusion_mark(row)
+    line = "　".join(part for part in (
+        cells["date"], cells["unit"], cells["bedrooms"], cells["area"],
+        cells["price"], cells["unit_price"], mark,
+    ) if part)
     return {
         "id": row["id"],
         "tx_id": row["tx_id"],
@@ -55,26 +82,25 @@ def row_payload(row: dict) -> dict:
         "deal_type": deal_type,
         "ins_date": row["ins_date"],
         "reg_date": row["reg_date"],
-        "unit": _row_cells(row)["unit"],
+        "unit": cells["unit"],
         "bedrooms": row["bedrooms"],
         "bedroom_label": bedroom_label(row["bedrooms"]),
         "saleable_area": row["saleable_area"],
-        "saleable_area_text": fmt.area(row["saleable_area"]),
+        "saleable_area_text": cells["area"],
         "price": row["price"],
-        "price_text": fmt.price(row["price"], deal_type),
+        "price_text": cells["price"],
         "saleable_unit_price": row["saleable_unit_price"],
-        "unit_price_text": fmt.unit_price(row["saleable_unit_price"], deal_type),
+        "unit_price_text": cells["unit_price"],
         "size_range": row["size_range"],
         "area_missing": bool(row["area_missing"]),
         "match_reason": row["match_reason"],
         "data_source": row["data_source"],
         "detail_url": row["detail_url"],
-        "line": (
-            f"{row['ins_date']}　{_row_cells(row)['unit']}　"
-            f"{bedroom_label(row['bedrooms'])}　{fmt.area(row['saleable_area'])}　"
-            f"{fmt.price(row['price'], deal_type)}　"
-            f"{fmt.unit_price(row['saleable_unit_price'], deal_type)}"
-        ),
+        "excluded": bool(row["excluded_at"]),
+        "excluded_at": row["excluded_at"],
+        "excluded_reason": row["excluded_reason"],
+        "excluded_mark": mark,
+        "line": line,
     }
 
 
@@ -307,6 +333,10 @@ def build(
             "new_count": len(rows),
             "pending_total": pending_total,
             "held_back": held_back,
+            # Flagged deals are announced like any other -- the marker on the line
+            # says they are not in the trend -- so the count is here rather than
+            # hidden, and the agent can say how many are outside the statistics.
+            "excluded_pending": sum(1 for row in rows if row["excluded_at"]),
             "groups": groups,
             "trends": trends,
             "summary_lines": _summary_lines(groups, trends, today, held_back),
@@ -346,7 +376,9 @@ def history(
     conn = conn or db.connect()
     today = clock.today()
     try:
-        rows = db.query(conn, estate=estate, deal_type=deal_type, limit=limit)
+        rows = db.query(
+            conn, estate=estate, deal_type=deal_type, limit=limit, include_excluded=True
+        )
         totals = next(
             (row for row in db.buckets(conn)
              if row["estate"] == estate and row["deal_type"] == deal_type),
@@ -387,6 +419,9 @@ def history(
             "deal_type": deal_type,
             "deal_label": fmt.deal_label(deal_type),
             "archive": totals,
+            # The listing below shows flagged deals, marked; every median and
+            # trend line above is built without them. Both facts are stated.
+            "excluded": totals["excluded"],
             "trend": movement,
             "trend_line": trend.summarise(movement),
             "monthly": series["points"],

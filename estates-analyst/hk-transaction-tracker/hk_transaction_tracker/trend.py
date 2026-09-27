@@ -21,6 +21,15 @@ differ by roughly a quarter and mixing them would manufacture a trend on its own
 Transactions with no 面積(實) carry no 呎價(實) and are excluded from every
 figure in this module. They are still reported to the reader, in their own
 group, by :mod:`hk_transaction_tracker.report`.
+
+**Flagged transactions are excluded too, and this module never sees them.**
+``db.set_excluded`` marks a row out of the statistics -- a price that is not a
+market price moves a median of four numbers further than any rounding. The
+filter lives in :func:`hk_transaction_tracker.db.query`, so every window, median
+and chart point here is built from the unflagged rows without this module
+knowing the flag exists. What this module owes the reader is the count: every
+payload carries how many flagged rows stand behind it, because a median that
+silently dropped a record is a lie of omission.
 """
 
 from __future__ import annotations
@@ -85,6 +94,7 @@ def bucket_trend(
         pct = round(pct, 2)
 
     priced = [row for row in rows if row["saleable_unit_price"] is not None]
+    excluded = db.excluded_count(conn, estate=estate, deal_type=deal_type)
     return {
         "estate": estate,
         "label": label or estate,
@@ -92,6 +102,10 @@ def bucket_trend(
         "deal_label": DEAL_LABELS.get(deal_type, deal_type),
         "window_days": window_days,
         "min_samples": min_samples,
+        # How many flagged rows are not in any figure above. Named separately
+        # from the samples so the reader can see the statistics are not the
+        # whole archive, and by how much.
+        "excluded": excluded,
         "recent": {
             "from": recent_start.isoformat(), "to": today.isoformat(),
             "median_unit_price": round(recent_median, 1) if recent_median is not None else None,
@@ -157,7 +171,8 @@ def monthly_series(
     ]
 
     earliest = conn.execute(
-        "SELECT MIN(ins_date) FROM transaction_row WHERE estate = ? AND deal_type = ?",
+        "SELECT MIN(ins_date) FROM transaction_row "
+        "WHERE estate = ? AND deal_type = ? AND excluded_at IS NULL",
         (estate, deal_type),
     ).fetchone()[0]
     partial = None
@@ -172,6 +187,7 @@ def monthly_series(
         "deal_label": DEAL_LABELS.get(deal_type, deal_type),
         "months": months,
         "points": points,
+        "excluded": db.excluded_count(conn, estate=estate, deal_type=deal_type),
         # Reported rather than hidden: "the archive starts here" is a fact about
         # the chart the reader is entitled to.
         "partial_first_month": partial,

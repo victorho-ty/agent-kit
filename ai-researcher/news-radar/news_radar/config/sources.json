@@ -24,8 +24,7 @@
     {
       "name": "github-copilot", "category": "ai", "kind": "rss",
       "url": "https://github.blog/changelog/label/copilot/feed/",
-      "max_items": 30,
-      "enabled": true
+      "max_items": 30, "enabled": true
     },
     {
       "name": "llm-news", "category": "ai", "kind": "html",
@@ -36,9 +35,7 @@
         "title": "h3",
         "summary": "p"
       },
-      "min_interval_minutes": 180,
-      "max_items": 30,
-      "enabled": true
+      "min_interval_minutes": 180, "max_items": 30, "enabled": true
     },
     {
       "name": "robot-report", "category": "robotics", "kind": "rss",

@@ -13,27 +13,23 @@
   "cluster_threshold": 0.7,
 
   "categories": [
-    { "name": "ai",    "label": "AI" },
-    { "name": "tech",  "label": "Technology" }
+    { "name": "ai", "label": "AI" },
+    { "name": "robotics", "label": "Physical AI" }
   ],
 
   // Dropped outright, whatever else the item says.
-  "exclude": ["sponsored", "advertisement", "newsletter signup"],
+  "exclude": ["sponsored", "advertisement", "newsletter signup", "techcrunch disrupt"],
 
   "sources": [
     {
-      "name": "github-copilot",
-      "category": "ai",
+      "name": "github-copilot", "category": "ai", "kind": "rss",
       "url": "https://github.blog/changelog/label/copilot/feed/",
-      "kind": "rss",
       "max_items": 30,
       "enabled": true
     },
     {
-      "name": "llm-news",
-      "category": "ai",
+      "name": "llm-news", "category": "ai", "kind": "html",
       "url": "https://llm-stats.com/ai-news",
-      "kind": "html",
       "render": "browser",
       "list_selector": "#llm-news div.space-y-3 > div",
       "fields": {
@@ -43,7 +39,30 @@
       "min_interval_minutes": 180,
       "max_items": 30,
       "enabled": true
+    },
+    {
+      "name": "robot-report", "category": "robotics", "kind": "rss",
+      "url": "https://www.therobotreport.com/feed/",
+      "max_items": 30, "enabled": true
+    },
+    {
+      "name": "nvidia-robotics", "category": "robotics", "kind": "rss",
+      "url": "https://blogs.nvidia.com/blog/category/robotics/feed/",
+      "min_interval_minutes": 360, "max_items": 20, "enabled": true
+    },
+    {
+      "name": "field-ai", "category": "robotics", "kind": "html", "render": "static",
+      "url": "https://fieldai.com/news",
+      "list_selector": ".w-dyn-item",
+      "fields": {
+        "title": "h3",
+        "link": "a[href^='/news/']@href",
+        "date": ".news-card-info .label:not(.news-label)"
+      },
+      "min_interval_minutes": 720, "max_items": 10, "enabled": true
     }
+  ]
+
 
 //    A source that should not be hit as often as the rest. min_interval_minutes
 //    is a floor, not a schedule: the hourly cron still runs, and this source is

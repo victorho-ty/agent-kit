@@ -235,7 +235,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--limit",
         type=int,
         default=settings.DEFAULT_CHANGE_WINDOW,
-        help="how many reported changes the charts cover (default 10)",
+        help=f"how many reported changes the charts cover "
+             f"(default {settings.DEFAULT_CHANGE_WINDOW})",
     )
     check.add_argument(
         "--meetings", type=int, default=snapshot.MEETINGS_TRACKED
@@ -259,7 +260,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--limit",
         type=int,
         default=settings.DEFAULT_CHANGE_WINDOW,
-        help="how many reported changes to cover (default 10)",
+        help=f"how many reported changes to cover (default {settings.DEFAULT_CHANGE_WINDOW})",
     )
     history.set_defaults(func=cmd_history)
 

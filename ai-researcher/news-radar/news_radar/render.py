@@ -1,5 +1,3 @@
-# Copied verbatim from education-radar/education_radar/render.py (2026-08-11).
-# It carries no news- or education-specific content; keep fixes in sync by hand.
 """The browser path, for sites that build their listings in JavaScript.
 
 Reached only for ``"render": "browser"``, and imported lazily, so a static-only

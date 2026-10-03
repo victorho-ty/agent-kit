@@ -3,34 +3,6 @@
 Why the bundle is shaped this way. Written alongside the implementation; where
 this document and the code disagree, the code is right and this file is a bug.
 
-## 0. Why a new bundle rather than extending education-radar
-
-About 70% of `education-radar`'s package code is domain-neutral plumbing, which
-argued for sharing it. Three things argued against merging, and won:
-
-- **The review queue has no news equivalent.** "I cannot tell who this is for"
-  is meaningless for a headline. That deletes `needs_review`, its reason enum,
-  `review set`, and a large slice of SKILL.md.
-- **Filter versus digest.** education-radar exists to *reject* most of what it
-  sees; this keeps everything from sources the human already chose and organises
-  it. The verdict enum and the include gate are selection machinery this job
-  does not want.
-- **Cross-source dedupe is the exact inverse.** education-radar deliberately
-  treats the same title on two sites as two listings — two schools running the
-  same-named event really are two events with two deadlines. Here they are one
-  piece of news, and a digest that repeats it once per outlet gets muted.
-
-On token cost the intuition is inverted: merging would cost *more*. The scan is
-a cron command either way, and per-digest cost is identical either way. The only
-difference is skill context — a merged SKILL.md spanning both domains, with a
-blurrier description, would load review-queue instructions while writing a news
-digest, every time.
-
-So: separate bundle, plumbing copied rather than shared, matching the convention
-that every bundle here is independently installable with its own venv and
-database. Each copied module carries a provenance header. The drift that invites
-is the accepted cost, and the header is the whole mitigation.
-
 ## 1. The scan and the digest are two programs
 
 `scan` collects and never speaks. `digest` speaks and never collects. They are
@@ -53,10 +25,9 @@ on its own frequent schedule.
 
 ## 2. No window, no interval, one floor
 
-education-radar had a `ScanWindow` because quiet hours are a policy about when
-to bother a person, and a cron expression states that badly. Here the scan
-bothers nobody, so the class, its arithmetic, `--force` and the
-`skipped`/`outside_window` status are all gone.
+Quiet hours are a policy about when to bother a person, and a cron expression
+states that badly — but the scan bothers nobody, so it needs no such policy at
+all. The digest's own cron entries decide when anyone is interrupted.
 
 A global `scan_interval` was considered and rejected: the cron entry already is
 the cadence, and restating it in config creates two sources of truth that drift
@@ -73,9 +44,9 @@ backed off too, not retried at full speed.
 
 ## 3. No matcher at all
 
-education-radar needed 293 lines of `match.py` to work out *who each listing was
-for*. Here the human answers that by assigning a category to the source, so
-there is nothing to infer: everything from a source in `ai` is AI news.
+There is nothing to infer about what an item is or who it is for. The human
+answers that by assigning a category to the source, so everything from a source
+in `ai` is AI news.
 
 What survives is a single global `exclude` list for feed furniture — sponsored
 posts, newsletter signups — which is a dozen lines inside `scan.py`, not a
@@ -177,5 +148,3 @@ The agent owns the channel, as in every other bundle here.
 - Parsing dates into structured timestamps (§7).
 - Any model call on the scan path.
 - URL shorteners — links stay the publisher's own.
-- Changes to `education-radar`; the copied modules diverge from the moment they
-  were copied, and the provenance headers are how that is managed.

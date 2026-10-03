@@ -1,10 +1,5 @@
 """One scan: fetch, extract, remember. It never reports anything.
 
-Adapted from education-radar/education_radar/scan.py. The window check and the
-audience matcher are gone; a per-source throttle and an exclude filter take
-their place. Seeding, the zero-yield guard, per-source isolation, the detail
-budget and the pacing are unchanged, and so are the reasons for them.
-
 The shape of a run:
 
 1. **Per source, in isolation.** One unreachable feed must never cost us the

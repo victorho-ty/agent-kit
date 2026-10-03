@@ -5,8 +5,6 @@ from ``fixtures/`` through :class:`FakeWeb`, and every function that needs the
 time is handed it. A test that needs a different instant passes a different one
 -- nothing is frozen globally, because nothing here reads the clock except the
 CLI.
-
-Adapted from education-radar/tests/conftest.py.
 """
 
 from __future__ import annotations

@@ -1,9 +1,5 @@
 """SQLite: what we have seen, what we have reported, and how each scan went.
 
-Adapted from education-radar/education_radar/db.py. ``site_state`` and ``runs``
-are unchanged; ``listing`` became ``item``, losing the verdict and review
-columns and gaining ``source_domain``.
-
 Three tables, three jobs:
 
 * **site_state** -- one row per source: its conditional-GET validators, its

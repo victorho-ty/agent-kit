@@ -34,11 +34,11 @@ news-radar/
 ```
 
 Much of the plumbing (`fetch.py`, `render.py`, `extract.py`, `clock.py`, and the
-bones of `db.py`, `scan.py` and `settings.py`) is copied from `education-radar`
-in this repo, following the convention that every bundle here is
-self-contained — its own venv, its own database, installable on its own. Each
-copied module says so in a header comment; fixes have to be carried across by
-hand.
+bones of `db.py`, `scan.py` and `settings.py`) is domain-neutral, and other
+bundles in this repo carry their own copy of it. That duplication is deliberate:
+every bundle here is self-contained — its own venv, its own database,
+installable on its own — so a fix to shared-looking plumbing has to be carried
+across by hand.
 
 ## Install on Ubuntu
 

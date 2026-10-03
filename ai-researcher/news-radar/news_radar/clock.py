@@ -1,5 +1,3 @@
-# Copied verbatim from education-radar/education_radar/clock.py (2026-08-11).
-# It carries no news- or education-specific content; keep fixes in sync by hand.
 """The one place that reads the wall clock.
 
 Every function that needs the time takes ``now`` as an argument; only the CLI

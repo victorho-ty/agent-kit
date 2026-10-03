@@ -8,9 +8,6 @@ where things are stored and how the client behaves.
 ``hermes-ai-researcher/`` so everything the profile knows sits in one directory,
 and a second bundle in the same profile needs no second backup rule. Moving this
 bundle to another profile is a one-line change to ``PROFILE_STATE_DIR``.
-
-Adapted from education-radar/education_radar/settings.py; the env prefix and the
-paths differ, nothing else does.
 """
 
 from __future__ import annotations

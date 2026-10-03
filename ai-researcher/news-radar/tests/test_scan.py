@@ -1,8 +1,7 @@
 """A whole run: seeding, dedupe, throttling, exclusion, failure isolation.
 
-Behaviour inherited from education-radar is retested here rather than assumed:
-these are copies, and a copy that quietly loses the seeding rule would be found
-by nobody.
+Tested end to end rather than assumed: a change that quietly lost the seeding
+rule or the per-source isolation would otherwise be found by nobody.
 """
 
 from __future__ import annotations

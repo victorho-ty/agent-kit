@@ -1,5 +1,3 @@
-# Copied from education-radar/education_radar/extract.py (2026-08-11).
-# Mechanically renamed site -> source; the logic is untouched. Keep fixes in sync.
 """Turning a page into candidate items.
 
 Three kinds, in the order you should reach for them:

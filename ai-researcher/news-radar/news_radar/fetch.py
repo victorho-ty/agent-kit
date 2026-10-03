@@ -1,5 +1,3 @@
-# Copied from education-radar/education_radar/fetch.py (2026-08-11).
-# Identical apart from USER_AGENT below; keep fixes in sync by hand.
 """Getting a page, politely.
 
 Plain ``urllib`` -- these are ordinary public pages and an HTTP stack would be a

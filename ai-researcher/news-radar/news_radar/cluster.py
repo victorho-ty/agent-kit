@@ -2,11 +2,6 @@
 
 This is the only genuinely new algorithm in the bundle, and it exists because a
 digest that lists the same story once per source reads like spam and gets muted.
-It is also the exact inverse of what education-radar does, which treats the same
-title on two sites as two listings on purpose -- there, two schools running the
-same-named event really are two events with two deadlines. Here they are one
-piece of news.
-
 Two items are the same story when either holds:
 
 1. **their canonical URLs are identical** -- straight syndication, and the

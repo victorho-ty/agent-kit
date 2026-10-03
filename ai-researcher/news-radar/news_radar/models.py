@@ -6,9 +6,8 @@
 ``Story``      one or more items that are the same piece of news, assembled at
                digest time and never stored.
 
-Adapted from education-radar/education_radar/models.py. The verdict and review
-enums are gone: this skill infers nothing about an item, because the human
-already said what a source is about by giving it a category.
+This skill infers nothing about an item, because the human already said what a
+source is about by giving it a category.
 """
 
 from __future__ import annotations

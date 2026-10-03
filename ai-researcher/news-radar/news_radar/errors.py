@@ -6,9 +6,6 @@ never reads stderr and never pattern-matches a human sentence.
 A *per-source* failure is not one of these. One unreachable feed must never
 abort a scan of the other ten, so those are collected into ``source_failures``
 and the run finishes ``partial``.
-
-Adapted from education-radar/education_radar/errors.py; ERR_ILLEGAL_VERDICT is
-gone with the review queue, which this skill has no equivalent of.
 """
 
 from __future__ import annotations

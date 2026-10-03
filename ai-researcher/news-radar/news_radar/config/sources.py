@@ -1,12 +1,11 @@
 """What is scanned, and which section of the digest it belongs to.
 
-Adapted from education-radar/education_radar/config/sites.py. Two differences
-worth knowing:
+Two things are deliberately absent:
 
-**There is no scan window.** education-radar had one because quiet hours are a
-policy about when to bother a person, and a cron expression states that badly.
-Here the scan never talks to anyone -- only the digest does -- so the scan can
-run continuously and the window, its arithmetic and ``--force`` are all gone.
+**There is no scan window.** Quiet hours are a policy about when to bother a
+person, and the scan talks to nobody -- only the digest does -- so the scan can
+run continuously and the digest's own schedule decides when anyone is
+interrupted.
 
 **There is no global interval either.** The cron entry *is* the cadence;
 restating it here would create two sources of truth that drift silently. What

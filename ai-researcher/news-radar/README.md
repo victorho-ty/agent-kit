@@ -1,10 +1,10 @@
-# Hermes news radar
+# News radar
 
 An agent skill plus the deterministic Python tools behind it. A scan runs
 continuously over a configured list of news sources and stores what is new; a
 digest, on its own schedule, reports everything published since the last one —
 clustered so a story carried by five outlets reads as one line, and grouped into
-the categories the household assigned to each source. The agent turns that into
+the categories the operator assigned to each source. The agent turns that into
 a message; it never decides what is new.
 
 ```
@@ -43,23 +43,25 @@ hand.
 ## Install on Ubuntu
 
 ```bash
-unzip news-radar.zip -d ~/projects/hermes
-cd ~/projects/hermes/news-radar
+unzip news-radar.zip -d ~/projects/hermes/profile-ai-researcher
+cd ~/projects/hermes/profile-ai-researcher/news-radar
 uv sync
 uv run playwright install --with-deps chromium   # only for "render": "browser" sources
 ```
 
-Point Hermes at the skill — either copy it into the agent's skills directory or
-symlink it:
+Point the agent at the skill — either copy it into the agent's skills directory
+or symlink it:
 
 ```bash
-ln -s ~/projects/hermes/news-radar/skills/news-radar ~/.hermes/skills/news-radar
+ln -s ~/projects/hermes/profile-ai-researcher/news-radar/skills/news-radar \
+      ~/.hermes/skills/news-radar
 ```
 
 And expose the console script so the skill works from any working directory:
 
 ```bash
-ln -s ~/projects/hermes/news-radar/.venv/bin/news-radar ~/.local/bin/news-radar
+ln -s ~/projects/hermes/profile-ai-researcher/news-radar/.venv/bin/news-radar \
+      ~/.local/bin/news-radar
 news-radar sources
 ```
 
@@ -68,8 +70,10 @@ news-radar sources
 This is the central design decision, so it goes first.
 
 ```bash
-cd ~/projects/hermes/news-radar && .venv/bin/news-radar scan             # hourly
-cd ~/projects/hermes/news-radar && .venv/bin/news-radar digest --commit  # 08:00, 18:00
+cd ~/projects/hermes/profile-ai-researcher/news-radar && \
+  .venv/bin/news-radar scan                                   # hourly
+cd ~/projects/hermes/profile-ai-researcher/news-radar && \
+  .venv/bin/news-radar digest --commit                        # 08:00, 18:00
 ```
 
 `scan` collects and says nothing — no message, no model call, no tokens. It can
@@ -98,13 +102,18 @@ right now"; it stamps nothing, so it does not consume the next scheduled digest.
 
 | Variable | Default |
 |---|---|
-| `NEWS_RADAR_DB` | `~/.local/share/hermes-news-radar/news_radar.db` |
+| `NEWS_RADAR_DB` | `~/.local/share/hermes-ai-researcher/news_radar.db` |
 | `NEWS_RADAR_CONFIG` | `news_radar/config/sources.json` in the bundle |
 | `NEWS_RADAR_TZ` | `Asia/Hong_Kong` (a `timezone` key in the config wins) |
 | `NEWS_RADAR_TIMEOUT` | `20` seconds per request |
 | `NEWS_RADAR_RETRIES` | `2` |
 | `NEWS_RADAR_DELAY` | overrides `request_delay_seconds` from the config |
 | `NEWS_RADAR_HEADLESS` | `1`; set `0` to watch the browser work |
+
+State is under `hermes-ai-researcher`, scoped to the profile rather than to this
+bundle, so a second bundle in the same profile needs no second backup rule.
+Moving this bundle to another profile is a one-line change to
+`PROFILE_STATE_DIR` in `settings.py`.
 
 What is watched lives in `news_radar/config/sources.json`. Whole-line `//`
 comments are stripped before parsing, so the file can carry disabled examples.
@@ -209,8 +218,8 @@ flag, last non-zero yield, and `last_scan_at` (which the throttle reads).
 `runs` — one row per scan, written even when everything fails. The agent's whole
 triage surface; the skill never parses stdout.
 
-There is no Telegram module anywhere in this package. Hermes owns the channel.
-Nothing is ever deleted.
+There is no Telegram module anywhere in this package. The agent owns the
+channel. Nothing is ever deleted.
 
 ## Tests
 
@@ -218,7 +227,7 @@ Nothing is ever deleted.
 uv run pytest -q
 ```
 
-66 tests, no network and no wall clock. `conftest.FakeWeb` serves captured feeds
+69 tests, no network and no wall clock. `conftest.FakeWeb` serves captured feeds
 and honours conditional GET; every function that needs the time is handed it.
 
 The tests that matter most:

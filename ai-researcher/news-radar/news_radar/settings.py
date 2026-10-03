@@ -4,6 +4,11 @@
 source or a recategorised one never means a code change. This module only holds
 where things are stored and how the client behaves.
 
+**Paths are scoped to the profile, not to the bundle.** State lives under
+``hermes-ai-researcher/`` so everything the profile knows sits in one directory,
+and a second bundle in the same profile needs no second backup rule. Moving this
+bundle to another profile is a one-line change to ``PROFILE_STATE_DIR``.
+
 Adapted from education-radar/education_radar/settings.py; the env prefix and the
 paths differ, nothing else does.
 """
@@ -14,7 +19,8 @@ import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-DEFAULT_DB_PATH = Path.home() / ".local" / "share" / "hermes-news-radar" / "news_radar.db"
+PROFILE_STATE_DIR = Path.home() / ".local" / "share" / "hermes-ai-researcher"
+DEFAULT_DB_PATH = PROFILE_STATE_DIR / "news_radar.db"
 DEFAULT_TZ = "Asia/Hong_Kong"
 DEFAULT_TIMEOUT = 20.0
 DEFAULT_RETRIES = 2

@@ -168,7 +168,7 @@ backlog after a crash, which nothing can undo.
 
 There is no Telegram module: no bot token, no `sendMessage` wrapper, no HTTP
 client for one. `digest.format_digest` returns a ready-to-send body and stops.
-Hermes owns the channel, as in every other bundle here.
+The agent owns the channel, as in every other bundle here.
 
 ## Out of scope
 

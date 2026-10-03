@@ -14,12 +14,10 @@
 
   "categories": [
     { "name": "ai",    "label": "AI" },
-    { "name": "equities",  "label": "Equities" },
-    { "name": "finance", "label": "Finance" },
     { "name": "tech",  "label": "Technology" }
   ],
 
-// Dropped outright, whatever else the item says.
+  // Dropped outright, whatever else the item says.
   "exclude": ["sponsored", "advertisement", "newsletter signup"],
 
   "sources": [

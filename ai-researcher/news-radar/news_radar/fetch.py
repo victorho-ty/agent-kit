@@ -28,7 +28,7 @@ import urllib.request
 from . import settings
 from .errors import FetchError
 
-USER_AGENT = "hermes-news-radar/0.1 (+personal news digest; hourly, conditional GET)"
+USER_AGENT = "news-radar/0.1 (+automated news digest; hourly, conditional GET)"
 
 
 @dataclasses.dataclass(frozen=True)

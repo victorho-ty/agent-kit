@@ -1,7 +1,7 @@
 """What to tell the reader, in sections they chose themselves.
 
-There is no Telegram code here, and none anywhere in this package. Hermes owns
-the channel; these tools only ever hand back JSON.
+There is no Telegram code here, and none anywhere in this package. The agent
+owns the channel; these tools only ever hand back JSON.
 
 Three decisions worth stating out loud:
 

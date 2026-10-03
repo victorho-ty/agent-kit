@@ -1,7 +1,7 @@
 [project]
 name = "news-radar"
 version = "0.1.0"
-description = "Watches configured news sources and digests what is new, by category, for a Hermes Agent skill"
+description = "Watches configured news sources and digests what is new, by category, for an agent skill"
 requires-python = ">=3.12"
 
 # Three runtime dependencies, each earning its place:

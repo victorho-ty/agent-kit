@@ -38,11 +38,6 @@
       "min_interval_minutes": 180, "max_items": 30, "enabled": true
     },
     {
-      "name": "robot-report", "category": "robotics", "kind": "rss",
-      "url": "https://www.therobotreport.com/feed/",
-      "max_items": 30, "enabled": true
-    },
-    {
       "name": "nvidia-robotics", "category": "robotics", "kind": "rss",
       "url": "https://blogs.nvidia.com/blog/category/robotics/feed/",
       "min_interval_minutes": 360, "max_items": 20, "enabled": true
@@ -58,38 +53,36 @@
       },
       "min_interval_minutes": 720, "max_items": 10, "enabled": true
     }
-  ]
 
-
-//    A source that should not be hit as often as the rest. min_interval_minutes
-//    is a floor, not a schedule: the hourly cron still runs, and this source is
-//    reported as "throttled" and skipped until its floor has passed. Use it for
-//    slow personal blogs and for anything with "render": "browser".
-//    {
-//      "name": "slow-blog",
-//      "category": "ai",
-//      "url": "https://example.dev/feed",
-//      "kind": "rss",
-//      "min_interval_minutes": 360,
-//      "enabled": false
-//    },
-//    An outlet with no feed. Selectors are a last resort -- they break on a
-//    redesign, which a feed cannot. Verify with --dry-run before enabling.
-//    {
-//      "name": "example-outlet",
-//      "category": "world",
-//      "url": "https://news.example.com/latest",
-//      "kind": "html",
-//      "render": "static",
-//      "list_selector": "article.story",
-//      "fields": {
-//        "title": "h2 a",
-//        "link": "h2 a@href",
-//        "summary": "p.standfirst",
-//        "date": "time"
-//      },
-//      "max_items": 25,
-//      "enabled": false
-//    }
+  //    A source that should not be hit as often as the rest. min_interval_minutes
+  //    is a floor, not a schedule: the hourly cron still runs, and this source is
+  //    reported as "throttled" and skipped until its floor has passed. Use it for
+  //    slow personal blogs and for anything with "render": "browser".
+  //    {
+  //      "name": "slow-blog",
+  //      "category": "ai",
+  //      "url": "https://example.dev/feed",
+  //      "kind": "rss",
+  //      "min_interval_minutes": 360,
+  //      "enabled": false
+  //    },
+  //    An outlet with no feed. Selectors are a last resort -- they break on a
+  //    redesign, which a feed cannot. Verify with --dry-run before enabling.
+  //    {
+  //      "name": "example-outlet",
+  //      "category": "world",
+  //      "url": "https://news.example.com/latest",
+  //      "kind": "html",
+  //      "render": "static",
+  //      "list_selector": "article.story",
+  //      "fields": {
+  //        "title": "h2 a",
+  //        "link": "h2 a@href",
+  //        "summary": "p.standfirst",
+  //        "date": "time"
+  //      },
+  //      "max_items": 25,
+  //      "enabled": false
+  //    }
   ]
 }

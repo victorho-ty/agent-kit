@@ -33,7 +33,7 @@ DEFAULT_CHART_ORIENTATION = "portrait"
 # reported -- that is what stops a slow drift hiding under this gate forever.
 DEFAULT_CHANGE_THRESHOLD = 4.0
 # How many changes a chart shows when the caller does not say.
-DEFAULT_CHANGE_WINDOW = 30
+DEFAULT_CHANGE_WINDOW = 15
 
 
 def db_path() -> Path:

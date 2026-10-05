@@ -105,7 +105,7 @@ Snap, then report what moved since the last snapshot that was *reported*.
 
 ```
 --threshold P    percentage points a probability must move to count (default 4.0)
---limit N        how many reported changes the charts cover (default 30)
+--limit N        how many reported changes the charts cover (default 15)
 --meetings N     how many upcoming meetings to price (default 2)
 --no-fetch       diff the stored history without fetching; for replay and outages
 --quiet          print a bare 1 or 0 and nothing else
@@ -163,7 +163,7 @@ an hour ago, and is reported once it accumulates past the threshold.
 The last N reported changes, summarised and charted. Fetches nothing.
 
 ```
---limit N        how many reported changes to cover (default 30)
+--limit N        how many reported changes to cover (default 15)
 ```
 
 ```json

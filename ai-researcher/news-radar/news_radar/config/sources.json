@@ -18,7 +18,7 @@
   ],
 
   // Dropped outright, whatever else the item says.
-  "exclude": ["sponsored", "advertisement", "newsletter signup", "techcrunch disrupt"],
+  "exclude": ["sponsored", "advertisement", "newsletter signup", "techcrunch disrupt", "White House"],
 
   "sources": [
     {

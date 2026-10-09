@@ -74,7 +74,7 @@ failed scope decisions, even when the transcript grace period expires.
    a path and not text on purpose — a forty-minute video is forty thousand
    characters, and you should open only what you are about to write about.
 2. **Send one message.** `sendMessage`, capped at `summary_char_cap`
-   characters (800), carrying the summary **and the `url`**. Write to that cap —
+   characters, carrying the summary **and the `url`**. Write to that cap —
    it is not a limit you may spend a paragraph apologising for.
 3. **Stamp it.** `video-summary mark --video <video_id>` — *after* the message
    has actually gone. This is what stops it coming round again in two hours.

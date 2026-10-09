@@ -33,18 +33,16 @@ sentence is the agent's.
 from __future__ import annotations
 
 import time as _time
-from datetime import datetime, timedelta
+import json
+from datetime import datetime
 
 from . import db, feed as feed_parser, fetch, transcript as transcript_tool
-from .errors import FetchError, VideoSummaryError
+from . import scope
+from .errors import FetchError, ScopeError, VideoSummaryError
 
 
 def _excluded(entry, keywords) -> str | None:
-    """The one thing that drops a video outright.
-
-    There is no *include* list anywhere in this skill: the operator already said
-    what a channel is about by subscribing to it.
-    """
+    """Hard exclusions take precedence over semantic scope classification."""
     if not keywords:
         return None
     text = db.normalize(entry.text_for_filtering())
@@ -158,6 +156,7 @@ def _collect_feed(
             candidates.append({
                 "video_id": entry.video_id,
                 "title": entry.title,
+                "description": entry.description,
                 "url": entry.url,
                 "thumbnail_url": entry.thumbnail_url,
                 "published_text": entry.published_text,
@@ -175,7 +174,8 @@ def _collect_feed(
             shorts_count += 1
             continue
 
-        db.insert_video(conn, entry, now, run_id=run_id, kind=kind, summarised=seeding)
+        db.insert_video(conn, entry, now, run_id=run_id, kind=kind, summarised=seeding,
+                        scope_required=config.scope_filter.enabled)
         if not feed.transcript:
             db.set_transcript_status(conn, entry.video_id, "skipped")
         new_count += 1
@@ -202,7 +202,7 @@ def _collect_feed(
 def _fill_transcripts(conn, config, now, *, budget: int, transcriber) -> dict:
     """Try the transcript for every pending video that could still get one."""
     ok = failed = attempted = 0
-    for video in db.pending_videos(conn):
+    for video in db.pending_videos(conn, require_scope=config.scope_filter.enabled):
         if attempted >= budget:
             break
         if video.transcript_status in ("ok", "skipped"):
@@ -234,7 +234,7 @@ def _release(conn, config, now, *, limit: int) -> tuple[list, int]:
     as a bare headline, which is the one thing this skill is meant to improve on.
     """
     ready, held = [], 0
-    for video in db.pending_videos(conn):
+    for video in db.pending_videos(conn, require_scope=config.scope_filter.enabled):
         releasable = (
             video.transcript_status in ("ok", "skipped")
             or video.transcript_attempts >= config.max_transcript_attempts
@@ -248,7 +248,71 @@ def _release(conn, config, now, *, limit: int) -> tuple[list, int]:
     return ready, held
 
 
-def check(
+def check(conn, config, feeds, now: datetime, *, classifier=None, **kwargs) -> dict:
+    """Own the JEV client once per check, and validate before recording a run."""
+    client = None
+    if config.scope_filter.enabled and classifier is None:
+        client = scope.JevClassifier(config.scope_filter)
+        classifier = client
+    try:
+        return _check(conn, config, feeds, now, classifier=classifier, **kwargs)
+    finally:
+        if client is not None:
+            client.close()
+
+
+def _classify_pending(conn, config, now, classifier) -> tuple[dict, list]:
+    counts = {"scope_attempted": 0, "scope_included": 0, "scope_excluded": 0, "scope_errors": 0}
+    failures = []
+    names = [feed.name for feed in config.select()]
+    for video in db.classification_videos(conn, now, feeds=names, limit=config.scope_filter.max_per_check):
+        counts["scope_attempted"] += 1
+        fingerprint = scope.input_hash(video.title, video.description, config.scope_filter.model)
+        try:
+            result = classifier(video.title, video.description).to_dict()
+        except ScopeError as exc:
+            db.record_scope(conn, video.video_id, now, error=exc, fingerprint=fingerprint)
+            counts["scope_errors"] += 1
+            failures.append({"video_id": video.video_id, "message": exc.message,
+                             "retryable": exc.retryable})
+            if exc.stop_run:
+                break
+        else:
+            db.record_scope(conn, video.video_id, now, result=result, fingerprint=fingerprint)
+            counts["scope_included" if result["is_target_scope"] else "scope_excluded"] += 1
+    return counts, failures
+
+
+def _preview_scope(results, config, classifier) -> tuple[dict, list]:
+    counts = {"scope_attempted": 0, "scope_included": 0, "scope_excluded": 0, "scope_errors": 0}
+    failures, decisions = [], {}
+    stopped = False
+    for row in results:
+        for candidate in row["candidates"]:
+            if candidate["excluded_as_short"]:
+                continue
+            video_id = candidate["video_id"]
+            if video_id not in decisions:
+                if stopped or counts["scope_attempted"] >= config.scope_filter.max_per_check:
+                    decisions[video_id] = {"status": "pending", "is_target_scope": None}
+                else:
+                    counts["scope_attempted"] += 1
+                    try:
+                        decisions[video_id] = classifier(candidate["title"], candidate["description"]).to_dict()
+                    except ScopeError as exc:
+                        decisions[video_id] = {"status": "error", "is_target_scope": None, "error": exc.message}
+                        failures.append({"video_id": video_id, "message": exc.message, "retryable": exc.retryable})
+                        counts["scope_errors"] += 1
+                        stopped = exc.stop_run
+                    else:
+                        key = "scope_included" if decisions[video_id]["is_target_scope"] else "scope_excluded"
+                        counts[key] += 1
+            candidate["scope"] = decisions[video_id]
+            candidate["would_send"] = candidate["would_send"] and decisions[video_id]["is_target_scope"] is True
+    return counts, failures
+
+
+def _check(
     conn,
     config,
     feeds,
@@ -263,6 +327,7 @@ def check(
     resolver=None,
     transcriber=None,
     sleeper=_time.sleep,
+    classifier=None,
 ) -> dict:
     """Run one check and return the payload the agent acts on."""
     fetcher = fetcher or fetch.get
@@ -299,17 +364,22 @@ def check(
         for name in zero_yield
     )
 
+    scope_counts = {"scope_attempted": 0, "scope_included": 0, "scope_excluded": 0, "scope_errors": 0}
+    classification_failures = []
+    if config.scope_filter.enabled:
+        if dry_run:
+            scope_counts, classification_failures = _preview_scope(results, config, classifier)
+        else:
+            scope_counts, classification_failures = _classify_pending(conn, config, now, classifier)
+
     shorts_excluded = sum(row["shorts_excluded"] for row in results)
     counts = {
         "feeds_checked": len(results),
         "entries_seen": sum(row["entries_seen"] for row in results),
         "videos_new": sum(row["videos_new"] for row in results),
-        # The `runs` column means "seen but not stored", whichever filter did it.
-        # The payload below keeps the two reasons apart, because "this channel
-        # posts nothing but Shorts" and "this channel posts nothing" are
-        # different answers to the same question.
-        "videos_excluded": sum(row["excluded"] for row in results) + shorts_excluded,
-        "errors": len(failures),
+        # Scope exclusions are retained; keyword and Shorts exclusions are dropped.
+        "videos_excluded": sum(row["excluded"] for row in results) + shorts_excluded + scope_counts["scope_excluded"],
+        "errors": len(failures) + len(classification_failures),
     }
 
     transcript_counts = {"transcripts_ok": 0, "transcripts_failed": 0, "transcripts_attempted": 0}
@@ -328,13 +398,14 @@ def check(
 
     if failures and len(failures) >= len(results):
         status = "error"
-    elif failures:
+    elif failures or classification_failures:
         status = "partial"
     else:
         status = "ok"
 
     if not dry_run:
-        db.finish_run(conn, run_id, now, status, counts)
+        db.finish_run(conn, run_id, now, status, counts,
+                      detail=json.dumps({"scope": scope_counts, "classification_failures": classification_failures}))
 
     payload = {
         "ok": status != "error",
@@ -345,15 +416,18 @@ def check(
         "summary_char_cap": config.summary_char_cap,
         "feeds": results,
         "feed_failures": failures,
+        "classification_failures": classification_failures,
         "totals": {
             **counts,
-            "videos_excluded_keyword": counts["videos_excluded"] - shorts_excluded,
+            "videos_excluded_keyword": sum(row["excluded"] for row in results),
             "videos_excluded_shorts": shorts_excluded,
+            "videos_excluded_scope": scope_counts["scope_excluded"],
+            **scope_counts,
             "transcripts_attempted": transcript_counts["transcripts_attempted"],
         },
         "videos": [_for_agent(video, config) for video in videos],
         "held_for_transcript": held,
-        **db.pending_count(conn),
+        **db.pending_count(conn, require_scope=config.scope_filter.enabled),
     }
     return payload
 

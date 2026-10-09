@@ -66,7 +66,7 @@ cd ~/projects/hermes/profile-stock-analyst/video-summary && .venv/bin/video-summ
 ```
 
 The cadence and the ledger are still independent, which is the property that
-matters: `check` returns every video where `summarised_at IS NULL`, however many
+matters: `check` considers unsent videos that pass any enabled scope gate, however many
 runs have happened since. A missed run needs no catch-up, a caught-up run
 repeats nothing, and the cron expression can change without touching anything
 else — which is why no interval is restated in the config.
@@ -86,9 +86,51 @@ someone wants their phone to buzz.
 | `VIDEO_SUMMARY_TIMEOUT` | `20` seconds per request |
 | `VIDEO_SUMMARY_RETRIES` | `5` (retries every HTTP error, 404 included, backing off 1s, 2s, 4s … capped at 30s) |
 | `VIDEO_SUMMARY_PROXY` | unset; a proxy for caption fetching only — see below |
+| `TYPESAFE_API_KEY` | unset; required when `scope_filter.enabled` is true |
 
 What is watched lives in `video_summary/config/feeds.json`. Whole-line `//`
 comments are stripped before parsing, so the file can carry disabled examples.
+
+### JEV scope gate
+
+The optional `scope_filter` runs after hard keyword and Shorts exclusions, before
+automatic transcript fetching or delivery. It sends both title and description
+to TypeSafe's JEV as structured state and asks one binary Choice: `include` or
+`exclude`. Python maps that choice to `is_target_scope`, copies native confidence
+to `confidence_score`, and supplies a generic fixed `reason`. No free-text
+explanation is generated. The policy is shipped in `config/scope_policy.json`.
+
+The shipped configuration keeps the gate disabled until the key is configured.
+Supply `TYPESAFE_API_KEY` in the environment of the scheduled process, then set:
+
+```json
+"scope_filter": {
+  "enabled": true,
+  "model": "jev-latest",
+  "max_per_check": 10,
+  "timeout_seconds": 20,
+  "max_attempts_per_request": 3
+}
+```
+
+Do not store the key in `feeds.json`. An ignored `.env` works only if your
+deployment loads it; this package does not load dotenv. Missing credentials
+fail before a check changes persistent state. The cron summarizer's model
+continues to inherit its profile settings.
+
+Accepted/excluded decisions persist in SQLite. Exclusions remain inspectable
+without delivery stamps. Failed or unclassified videos stay held; retryable
+errors are retried after 120 minutes even on a 304 or throttled feed. Permanent
+errors require `video-summary classify --video <id> --refresh`. Cold-start
+history incurs no classifier requests. `--no-transcript` does not bypass scope.
+`check --dry-run` makes billable JEV calls when enabled but uses an in-memory
+database snapshot and writes no persistent state or transcript files.
+
+Use `videos --scope-state excluded`, `--scope-state error`, or
+`--scope-state classification` for triage. Turning the gate off explicitly
+bypasses classification, including stored exclusions; `feeds.scope_filter`
+reports that bypass. Existing hard keywords remain absolute, so incidental
+broker mentions may be dropped before JEV can apply its exceptions.
 
 ```json
 {
@@ -137,7 +179,8 @@ unique, so a channel feed and a playlist feed carrying the same upload store —
 and send — it once. This is the exact inverse of `news-radar`, where the same
 story from two outlets is deliberately two items.
 
-**The ledger is a column.** `summarised_at IS NULL` means pending. `check` never
+**The ledger is a column.** `summarised_at IS NULL` means unsent; enabled scope
+classification must also accept it before delivery. `check` never
 stamps; `mark` does, per video, after the send has actually happened. A batch
 stamped up front loses every video after a failure; a batch stamped at the end
 re-sends the ones that already arrived. `mark` is idempotent, so a retry is safe.

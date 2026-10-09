@@ -25,6 +25,10 @@ DEFAULT_TIMEOUT = 20.0
 DEFAULT_RETRIES = 5
 
 
+def typesafe_api_key() -> str | None:
+    return os.environ.get("TYPESAFE_API_KEY", "").strip() or None
+
+
 def db_path() -> Path:
     return Path(os.environ.get("VIDEO_SUMMARY_DB", str(DEFAULT_DB_PATH))).expanduser()
 

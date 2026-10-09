@@ -17,6 +17,7 @@ file as documentation.
 | `max_transcript_attempts` | `3` | attempts per video before it is left alone |
 | `exclude_shorts` | `true` | drop Shorts at the door; the default for every feed |
 | `exclude` | none | drops a video outright, whatever else it says |
+| `scope_filter` | disabled | JEV binary Choice over title and description; see [scope classification](scope-classification.md) |
 
 There is deliberately **no schedule key**. The cron entry is the cadence;
 restating it here would be a second source of truth that drifts. What cron
@@ -174,10 +175,11 @@ check and returns none now is reported `zero_yield`. A feed that has *never*
 yielded anything is treated as quiet, so a wrong url on a brand new feed is only
 caught by `--dry-run`.
 
-**`exclude` is the only filter, and it is substring-matched** on title and
+**`exclude` is the hard keyword filter, and it is substring-matched** on title and
 description after case folding. Keep the terms specific: `"ad"` would match
-`"advance"`, `"Adelaide"` and `"broadband"`. There is no include list — the
-operator already said what a channel is about by subscribing to it.
+`"advance"`, `"Adelaide"` and `"broadband"`. The optional JEV scope gate runs
+after it and Shorts detection, before captions or delivery. Hard exclusions
+cannot be rescued by JEV's incidental-mention rules.
 
 **`published_text` is never parsed.** It is YouTube's own string, passed through.
 Nothing in this bundle needs the value — ordering is by the order we first saw

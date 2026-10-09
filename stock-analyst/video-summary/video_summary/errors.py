@@ -25,6 +25,7 @@ class ExitCode(IntEnum):
     ERR_DB = 11           # the database could not be opened or written
     ERR_FETCH = 20        # the only feed asked for could not be reached
     ERR_TRANSCRIPT = 22   # a transcript was asked for by name and could not be produced
+    ERR_SCOPE = 23        # classification failed or a video is not eligible
     ERR_NOT_FOUND = 30    # no video with that id, no feed with that name
 
 
@@ -85,3 +86,13 @@ class TranscriptError(VideoSummaryError):
 class NotFoundError(VideoSummaryError):
     exit_code = ExitCode.ERR_NOT_FOUND
     error = "ERR_NOT_FOUND"
+
+
+class ScopeError(VideoSummaryError):
+    exit_code = ExitCode.ERR_SCOPE
+    error = "ERR_SCOPE"
+
+    def __init__(self, message: str, *, retryable: bool = False, stop_run: bool = False):
+        super().__init__(message)
+        self.retryable = retryable
+        self.stop_run = stop_run

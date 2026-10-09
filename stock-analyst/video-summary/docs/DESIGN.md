@@ -7,14 +7,14 @@ this document and the code disagree, the code is right and this file is a bug.
 
 news-radar splits `scan` from `digest` because a digest must wait: stories
 arrive from different outlets at different times and only cluster once several
-are pending. Nothing here waits for anything except a caption track, and that
-wait is measured in minutes and handled inside the run.
+are pending. This watcher can wait for scope classification or a caption track;
+both are handled through persisted state inside each run.
 
 So `check` collects *and* reports, and there is one cron entry.
 
 What is deliberately kept from news-radar is the property that mattered — the
 coupling to the schedule is a **column**, not a clock. `check` returns every
-video where `summarised_at IS NULL`, however many runs happened since:
+unsent video that passes the enabled scope gate, however many runs happened since:
 
 - a missed run needs no catch-up, because "new" is `video_id` against the table
   rather than a time range;
@@ -143,17 +143,17 @@ its Shorts gets a two-sentence summary rather than a paragraph.
 
 ## 7. Where the model is, and where it is not
 
-The tools decide **what is new** and **what was said**. The model decides **what
-is worth saying**, which is the only judgement in the pipeline and the reason
-this is a skill rather than a shell script with a webhook.
+Python tracks what is new and fetches captions. Optional JEV makes the scope
+judgment through a typed decision with persisted provenance. The agent's model
+decides what is worth saying from the transcript and profile context.
 
 That boundary was the one real fork in the design. The alternative — the bundle
 holding an API key and returning a finished summary string — is cheaper per
 wake-up and gives deterministic output length. It was rejected because:
 
-- it puts a second, unaccountable model inside a tool the agent is told to trust
-  as deterministic;
-- it needs a key on the Hermes host, and a second billing surface;
+- generated summary prose would expand the tool's responsibility beyond a
+  narrow, auditable scope decision;
+- it would require another model integration beyond the optional JEV gate;
 - the summary is exactly where profile context belongs. The `stock-analyst`
   SOUL — the four readings, the labelling of `fact` / `derived` / `opinion`, the
   refusal to state a market claim on a YouTuber's authority — is loaded in the
@@ -211,9 +211,8 @@ allowed to exit non-zero on it.
 
 - **No summaries table** (§7), **no Telegram module** (§8), **no scheduler**
   (§1).
-- **No include list.** The operator subscribed to the channel; everything it
-  posts is in scope. `exclude` exists only for feed furniture and is the one
-  filter there is.
+- **No keyword include list.** Optional JEV classification judges scope from
+  title and description after hard keyword and Shorts exclusions.
 - **No date parsing.** `published_text` is YouTube's own string. Ordering is by
   the order we first saw things, which is what the ledger already implies.
 - **No view counts, no engagement metrics.** They change after publication,
@@ -222,3 +221,27 @@ allowed to exit non-zero on it.
 - **No transcript search, no cross-video analysis.** Both are real ideas and
   neither is this skill's job. The transcripts are plain text on disk with
   predictable names if something else ever wants them.
+
+## 11. Scope is a judgment, delivery is a ledger
+
+The optional JEV adapter asks one binary Choice over structured title and
+description. The effective policy lives in `config/scope_policy.json`. JEV owns
+the judgment; Python validates and persists the answer, supplies a generic
+reason, and gates automatic captions and release. Confidence is diagnostic.
+
+Classification happens after feed collection so 304 and throttle outcomes cannot
+strand retries. Stored exclusions remain unsent for inspection; failed calls stay
+held. Neither is stamped as delivered. Caption grace expiry never bypasses scope.
+The same eligibility guard protects both marking forms. Seeded history costs no
+JEV requests. Legacy unsent rows join the classifier queue when enabled.
+
+The SDK provides the sole bounded transport retry layer. Transient failures can
+retry after 120 minutes; permanent errors require explicit refresh. There is a
+separate request budget so a backlog cannot cause unlimited calls. Additive
+schema migration keeps old timestamps and captions. Preview uses an in-memory
+copy so it makes no persistent changes, though its API calls are billable.
+
+Disabled mode deliberately bypasses recorded scope decisions and reports that
+configuration to the operator. `TYPESAFE_API_KEY` is environment-only; no key is
+stored in configuration, state, payloads, or logs. The scheduled summarizer still
+inherits its profile model independently of JEV service selection.

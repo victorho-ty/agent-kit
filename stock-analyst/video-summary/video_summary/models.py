@@ -14,6 +14,7 @@ video went out, not what was said about it.
 from __future__ import annotations
 
 import dataclasses
+import json
 import sqlite3
 
 # A run's outcome. `skipped` is a success: nothing was enabled to check.
@@ -80,6 +81,14 @@ class Video:
     transcript_attempts: int
     summarised_at: str | None
     run_id: int | None
+    scope_status: str
+    scope_result: str | None
+    scope_input_hash: str | None
+    scope_checked_at: str | None
+    scope_attempts: int
+    scope_next_attempt_at: str | None
+    scope_error: str | None
+    scope_retryable: int
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> "Video":
@@ -104,6 +113,14 @@ class Video:
             transcript_attempts=row["transcript_attempts"],
             summarised_at=row["summarised_at"],
             run_id=row["run_id"],
+            scope_status=row["scope_status"],
+            scope_result=row["scope_result"],
+            scope_input_hash=row["scope_input_hash"],
+            scope_checked_at=row["scope_checked_at"],
+            scope_attempts=row["scope_attempts"],
+            scope_next_attempt_at=row["scope_next_attempt_at"],
+            scope_error=row["scope_error"],
+            scope_retryable=row["scope_retryable"],
         )
 
     def to_dict(self) -> dict:
@@ -126,6 +143,7 @@ class Video:
             "published_text": self.published_text,
             "first_seen_at": self.first_seen_at,
             "summarised_at": self.summarised_at,
+            "scope": self.scope_payload(),
             "transcript": {
                 "status": self.transcript_status,
                 "path": self.transcript_path,
@@ -134,4 +152,16 @@ class Video:
                 "attempts": self.transcript_attempts,
                 "error": self.transcript_error,
             },
+        }
+
+    def scope_payload(self) -> dict:
+        result = json.loads(self.scope_result) if self.scope_result else {
+            "is_target_scope": None, "reason": None, "confidence_score": None,
+        }
+        return {
+            **result, "status": self.scope_status,
+            "checked_at": self.scope_checked_at, "attempts": self.scope_attempts,
+            "next_attempt_at": self.scope_next_attempt_at, "error": self.scope_error,
+            "input_hash": self.scope_input_hash,
+            "retryable": bool(self.scope_retryable),
         }

@@ -5,9 +5,8 @@ Adapted from news-radar/news_radar/db.py. Three tables, three jobs:
 * **feed_state** -- one row per feed: its conditional-GET validators, its
   failure streak, whether it has been seeded, what it yielded last time, and
   when it was last checked (which is also what the per-feed throttle reads).
-* **video** -- every video ever seen, with its transcript state alongside it.
-  ``summarised_at`` doubles as the ledger, so there is no second table to keep
-  in sync: a video is pending when it has not been stamped.
+* **video** -- every stored video, transcript state, scope decision, and delivery
+  stamp. Unsent videos must also pass the scope gate when it is enabled.
 * **runs** -- one row per check including the failures, which is the agent's
   whole triage surface. It never parses stdout.
 
@@ -24,6 +23,7 @@ the primary key and the second feed to see a video simply does not re-insert it.
 from __future__ import annotations
 
 import re
+import json
 import sqlite3
 import unicodedata
 from datetime import datetime, timedelta
@@ -31,6 +31,7 @@ from pathlib import Path
 
 from . import settings
 from .models import Video
+from .errors import ScopeError
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS feed_state (
@@ -90,13 +91,38 @@ CREATE TABLE IF NOT EXISTS runs (
 
 _WHITESPACE = re.compile(r"\s+")
 
+SCOPE_COLUMNS = {
+    "scope_status": "TEXT NOT NULL DEFAULT 'not_required'",
+    "scope_result": "TEXT",
+    "scope_input_hash": "TEXT",
+    "scope_checked_at": "TEXT",
+    "scope_attempts": "INTEGER NOT NULL DEFAULT 0",
+    "scope_next_attempt_at": "TEXT",
+    "scope_error": "TEXT",
+    "scope_retryable": "INTEGER NOT NULL DEFAULT 1",
+}
 
-def connect(path: Path | str | None = None) -> sqlite3.Connection:
+
+def connect(path: Path | str | None = None, *, preview: bool = False) -> sqlite3.Connection:
     path = Path(path) if path is not None else settings.db_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path)
+    if preview:
+        conn = sqlite3.connect(":memory:")
+        if path.exists():
+            source = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True)
+            try:
+                source.backup(conn)
+            finally:
+                source.close()
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(video)")}
+    for name, definition in SCOPE_COLUMNS.items():
+        if name not in columns:
+            conn.execute(f"ALTER TABLE video ADD COLUMN {name} {definition}")
+    conn.commit()
     return conn
 
 
@@ -218,6 +244,7 @@ def insert_video(
     run_id: int | None = None,
     kind: str = "unknown",
     summarised: bool = False,
+    scope_required: bool = False,
 ) -> int:
     """Store a newly seen entry.
 
@@ -226,9 +253,9 @@ def insert_video(
     """
     cursor = conn.execute(
         """INSERT INTO video (video_id, feed, channel, channel_url, title, url, thumbnail_url,
-                              kind, published_text, description, first_seen_at, summarised_at, run_id)
+                              kind, published_text, description, first_seen_at, summarised_at, run_id, scope_status)
            VALUES (:video_id, :feed, :channel, :channel_url, :title, :url, :thumbnail_url,
-                   :kind, :published_text, :description, :first_seen_at, :summarised_at, :run_id)""",
+                   :kind, :published_text, :description, :first_seen_at, :summarised_at, :run_id, :scope_status)""",
         {
             "video_id": entry.video_id,
             "feed": entry.feed,
@@ -243,6 +270,7 @@ def insert_video(
             "first_seen_at": now.isoformat(),
             "summarised_at": now.isoformat() if summarised else None,
             "run_id": run_id,
+            "scope_status": "pending" if scope_required and not summarised else "not_required",
         },
     )
     conn.commit()
@@ -276,14 +304,17 @@ def pending_videos(
     conn: sqlite3.Connection,
     feeds: list[str] | None = None,
     limit: int | None = None,
+    *, require_scope: bool = False,
 ) -> list[Video]:
-    """Everything not yet summarised, oldest first so a backlog drains in order.
+    """Unsent delivery candidates, optionally restricted to accepted scope.
 
     Note what this does *not* take: a time range. "Since the last message" is
     defined by the ledger, not by the clock, which is why a missed cron run
     costs nothing and a caught-up one repeats nothing.
     """
     sql = "SELECT * FROM video WHERE summarised_at IS NULL"
+    if require_scope:
+        sql += " AND scope_status = 'included'"
     params: list = []
     if feeds is not None:
         if not feeds:
@@ -297,10 +328,16 @@ def pending_videos(
     return [Video.from_row(row) for row in conn.execute(sql, params).fetchall()]
 
 
-def mark_summarised(conn: sqlite3.Connection, video_ids: list[str], now: datetime) -> list[str]:
+def mark_summarised(conn: sqlite3.Connection, video_ids: list[str], now: datetime,
+                    *, require_scope: bool = False) -> list[str]:
     """Stamp videos as sent. Returns the ones that were actually still pending."""
     if not video_ids:
         return []
+    if require_scope:
+        for video_id in video_ids:
+            video = find_video(conn, video_id)
+            if video and video.summarised_at is None and video.scope_status != "included":
+                raise ScopeError(f"video {video_id} is not eligible for delivery")
     stamped = []
     for video_id in video_ids:
         cursor = conn.execute(
@@ -313,9 +350,48 @@ def mark_summarised(conn: sqlite3.Connection, video_ids: list[str], now: datetim
     return stamped
 
 
-def pending_count(conn: sqlite3.Connection) -> dict:
-    count = conn.execute("SELECT COUNT(*) FROM video WHERE summarised_at IS NULL").fetchone()[0]
-    return {"pending_videos": count}
+def pending_count(conn: sqlite3.Connection, *, require_scope: bool = False) -> dict:
+    rows = conn.execute(
+        "SELECT scope_status, COUNT(*) AS n FROM video WHERE summarised_at IS NULL GROUP BY scope_status"
+    ).fetchall()
+    counts = {row["scope_status"]: row["n"] for row in rows}
+    waiting = sum(counts.get(state, 0) for state in ("not_required", "pending", "error"))
+    return {
+        "pending_videos": counts.get("included", 0) if require_scope else sum(counts.values()),
+        "held_for_classification": waiting if require_scope else 0,
+        "scope_excluded_videos": counts.get("excluded", 0),
+    }
+
+
+def classification_videos(conn, now, *, feeds=None, limit=None) -> list[Video]:
+    sql = """SELECT * FROM video WHERE summarised_at IS NULL
+             AND scope_status IN ('not_required', 'pending', 'error')
+             AND scope_retryable = 1
+             AND (scope_next_attempt_at IS NULL OR scope_next_attempt_at <= ?)"""
+    params = [now.isoformat()]
+    if feeds is not None:
+        if not feeds:
+            return []
+        sql += f" AND feed IN ({','.join('?' * len(feeds))})"
+        params.extend(feeds)
+    sql += " ORDER BY id ASC"
+    if limit is not None:
+        sql += " LIMIT ?"
+        params.append(limit)
+    return [Video.from_row(row) for row in conn.execute(sql, params)]
+
+
+def record_scope(conn, video_id, now, *, result=None, error=None, fingerprint=None):
+    status = result["status"] if result else "error"
+    retry_at = (now + timedelta(minutes=120)).isoformat() if error and error.retryable else None
+    conn.execute(
+        """UPDATE video SET scope_status = ?, scope_result = ?, scope_input_hash = ?,
+           scope_checked_at = ?, scope_attempts = scope_attempts + 1,
+           scope_next_attempt_at = ?, scope_error = ?, scope_retryable = ? WHERE video_id = ?""",
+        (status, json.dumps(result) if result else None, fingerprint, now.isoformat(),
+         retry_at, error.message if error else None, int(error.retryable) if error else 1, video_id),
+    )
+    conn.commit()
 
 
 def recent_videos(
@@ -325,8 +401,9 @@ def recent_videos(
     since: str | None = None,
     state: str | None = None,
     limit: int = 20,
+    require_scope: bool = False,
 ) -> list[Video]:
-    """Newest first. ``state`` is ``pending`` | ``summarised`` | ``None``."""
+    """Newest first, optionally restricted by delivery or classification state."""
     clauses, params = [], []
     if feeds is not None:
         if not feeds:
@@ -338,8 +415,17 @@ def recent_videos(
         params.append(since)
     if state == "pending":
         clauses.append("summarised_at IS NULL")
+        if require_scope:
+            clauses.append("scope_status = 'included'")
     elif state == "summarised":
         clauses.append("summarised_at IS NOT NULL")
+    elif state in ("excluded", "error", "classification"):
+        clauses.append("summarised_at IS NULL")
+        if state == "classification":
+            clauses.append("scope_status IN ('not_required', 'pending', 'error')")
+        else:
+            clauses.append("scope_status = ?")
+            params.append(state)
     where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
     rows = conn.execute(
         f"SELECT * FROM video{where} ORDER BY id DESC LIMIT ?", (*params, limit)
@@ -347,11 +433,12 @@ def recent_videos(
     return [Video.from_row(row) for row in rows]
 
 
-def feed_counts(conn: sqlite3.Connection) -> dict[str, dict]:
+def feed_counts(conn: sqlite3.Connection, *, require_scope: bool = False) -> dict[str, dict]:
+    eligible = "summarised_at IS NULL" + (" AND scope_status = 'included'" if require_scope else "")
     rows = conn.execute(
-        """SELECT feed,
+        f"""SELECT feed,
                   COUNT(*) AS videos,
-                  SUM(CASE WHEN summarised_at IS NULL THEN 1 ELSE 0 END) AS pending,
+                  SUM(CASE WHEN {eligible} THEN 1 ELSE 0 END) AS pending,
                   MAX(first_seen_at) AS latest_seen_at
              FROM video GROUP BY feed"""
     ).fetchall()

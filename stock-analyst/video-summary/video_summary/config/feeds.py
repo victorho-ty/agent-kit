@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import math
 import re
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -132,6 +133,31 @@ class Feed:
 
 
 @dataclasses.dataclass(frozen=True)
+class ScopeFilter:
+    enabled: bool = False
+    model: str = "jev-latest"
+    max_per_check: int = 10
+    timeout_seconds: float = 20.0
+    max_attempts_per_request: int = 3
+
+    def __post_init__(self):
+        if type(self.enabled) is not bool:
+            raise ConfigError("scope_filter.enabled must be a boolean")
+        if not isinstance(self.model, str) or not self.model.strip():
+            raise ConfigError("scope_filter.model must be a nonempty string")
+        for name in ("max_per_check", "max_attempts_per_request"):
+            value = getattr(self, name)
+            if type(value) is not int or value < 1:
+                raise ConfigError(f"scope_filter.{name} must be a positive integer")
+        if (type(self.timeout_seconds) not in (int, float)
+                or not math.isfinite(self.timeout_seconds) or self.timeout_seconds <= 0):
+            raise ConfigError("scope_filter.timeout_seconds must be finite and positive")
+
+    def to_dict(self) -> dict:
+        return dataclasses.asdict(self)
+
+
+@dataclasses.dataclass(frozen=True)
 class FeedConfig:
     """The whole config file."""
 
@@ -146,6 +172,7 @@ class FeedConfig:
     max_transcript_attempts: int
     exclude_shorts: bool
     path: Path
+    scope_filter: ScopeFilter = dataclasses.field(default_factory=ScopeFilter)
 
     def tzinfo(self) -> ZoneInfo:
         return ZoneInfo(self.timezone_name)
@@ -249,6 +276,14 @@ def load_config(path: Path | str | None = None) -> FeedConfig:
     if attempts < 1:
         raise ConfigError(f"{path}: max_transcript_attempts must be >= 1")
 
+    scope_raw = raw.get("scope_filter", {})
+    if not isinstance(scope_raw, dict):
+        raise ConfigError("scope_filter must be an object")
+    try:
+        scope_filter = ScopeFilter(**scope_raw)
+    except TypeError as exc:
+        raise ConfigError(f"invalid scope_filter: {exc}") from exc
+
     return FeedConfig(
         timezone_name=timezone_name,
         feeds=feeds,
@@ -261,6 +296,7 @@ def load_config(path: Path | str | None = None) -> FeedConfig:
         max_transcript_attempts=attempts,
         exclude_shorts=exclude_shorts,
         path=path,
+        scope_filter=scope_filter,
     )
 
 

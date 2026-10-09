@@ -6,13 +6,22 @@
   "timezone": "Asia/Hong_Kong",
   "request_delay_seconds": 2.0,
 
+  // Enable after supplying TYPESAFE_API_KEY to the process running the skill.
+  "scope_filter": {
+    "enabled": true,
+    "model": "jev-latest",
+    "max_per_check": 10,
+    "timeout_seconds": 20,
+    "max_attempts_per_request": 3
+  },
+
   // How many videos one check hands over. The rest stay pending and come round
   // on the next one -- a backlog is drained, never dropped.
   "max_per_check": 5,
 
   // What the agent is told to write to, per video. Telegram's hard limit is
   // 4096; this is a choice about what someone reads on a phone.
-  "summary_char_cap": 800,
+  "summary_char_cap": 1000,
 
   // Preferred caption languages, best first. A manually written track is always
   // preferred over an auto-generated one in the same language.
@@ -28,9 +37,8 @@
   // this exists for. Every new video is resolved short-or-long either way.
   "exclude_shorts": true,
 
-  // Dropped outright, whatever else the entry says. Substring match, case
-  // folded, over title and description. Keep the terms specific.
-  "exclude": ["Interactive Brokers", "Fidelity"],
+  // Dropped outright, whatever else the entry says. Substring match, case folded, over title and description.
+  "exclude": ["Interactive Brokers", "Fidelity", "Vanguard"],
 
   "feeds": [
     {
@@ -45,6 +53,13 @@
       "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UCwTu6kD2igaLMpxswtcdxlg",
       "note": "Equities, Cryptos, swing-trades",
       "exclude_shorts": false,
+      "max_items": 10,
+      "enabled": true
+    },
+    {
+      "name": "DavidLin",
+      "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UClBMLpP3UHXLmgEypMmXPuA",
+      "note": "Markets, Finance, Trading",
       "max_items": 10,
       "enabled": true
     },

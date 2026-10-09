@@ -20,6 +20,7 @@ Every command prints one indented JSON object on stdout. Success is
 | 11 | `ERR_DB` | the database could not be opened or written |
 | 20 | `ERR_FETCH` | no feed could be reached at all |
 | 22 | `ERR_TRANSCRIPT` | `transcript --refresh` was asked for one video and could not produce it |
+| 23 | `ERR_SCOPE` | scope refresh failed, or a video is ineligible for marking |
 | 30 | `ERR_NOT_FOUND` | no video with that id, no feed with that name |
 
 A *per-feed* failure during a check is none of these. It goes into
@@ -109,7 +110,7 @@ from the link. There is no `sendPhoto` step.
 yet. They are not in `videos` and need no comment.
 
 `candidates` is populated only by `--dry-run`, and carries `video_id`, `title`,
-`url`, `thumbnail_url`, `published_text`, `kind`, `excluded_as_short` and
+`description`, `url`, `thumbnail_url`, `published_text`, `kind`, `excluded_as_short` and
 `would_send`. A dry run resolves `kind`, so it tells the truth about what the
 Shorts filter would drop — which is the point of running it before enabling a
 feed.
@@ -117,8 +118,29 @@ feed.
 `excluded` counts the keyword filter; `shorts_excluded` counts Shorts dropped by
 `exclude_shorts`. Both are dropped **before** storage, so neither appears in
 `videos` and neither costs a transcript fetch. `totals.videos_excluded` is the
-sum of the two, matching the `runs` column; the two `videos_excluded_*` keys
-break it down.
+sum of keyword, Shorts, and newly recorded scope exclusions, matching the
+`runs` column. `videos_excluded_keyword`, `videos_excluded_shorts`, and
+`videos_excluded_scope` break it down. Scope exclusions are retained in SQLite.
+
+When enabled, JEV binary Choice over title and description precedes captions.
+Every stored video's payload has `scope` with status, nullable `is_target_scope`,
+fixed `reason`, `confidence_score`, decision metadata, attempts, retry state,
+and sanitized error. Only `included` videos can be delivered or marked.
+`pending_videos` then counts accepted unsent videos;
+`held_for_classification` counts unclassified/error rows, and
+`scope_excluded_videos` counts accumulated unsent exclusions. Disabled mode
+bypasses the gate and reports `scope_filter.bypassed` from `feeds`.
+
+`totals` includes `scope_attempted`, `scope_included`, `scope_excluded`, and
+`scope_errors`. `classification_failures` is separate from `feed_failures`;
+either can make a check partial. Run `detail` stores classification diagnostics
+as a JSON string. Dry runs preview classification with billable API calls but
+use an in-memory snapshot without state or caption writes.
+
+For triage use `videos --scope-state excluded|error|classification`, or
+`classify --video <id>` to inspect. `classify --video <id> --refresh` makes a
+billable call for an unsent row, including permanent failures. Sent/seeded
+rows cannot be refreshed. See [scope classification](scope-classification.md).
 
 `feed_failures` entries carry `feed`, `reason` (`fetch_failed` | `parse_failed`
 | `zero_yield`) and `message`.
@@ -242,7 +264,7 @@ CREATE TABLE runs (
   feeds_checked       INTEGER NOT NULL DEFAULT 0,
   entries_seen        INTEGER NOT NULL DEFAULT 0,
   videos_new          INTEGER NOT NULL DEFAULT 0,
-  videos_excluded     INTEGER NOT NULL DEFAULT 0,   -- keyword + Shorts, both dropped pre-storage
+  videos_excluded     INTEGER NOT NULL DEFAULT 0,   -- keyword + Shorts + newly recorded scope exclusions
   transcripts_ok      INTEGER NOT NULL DEFAULT 0,
   transcripts_failed  INTEGER NOT NULL DEFAULT 0,
   errors              INTEGER NOT NULL DEFAULT 0,
@@ -257,6 +279,12 @@ where two outlets carrying one story are genuinely two items.
 
 **There is no summaries table.** The summary is written by the model and sent
 over Telegram; storing a copy would make this bundle the owner of something it
-cannot check. `summarised_at IS NULL` is the whole ledger, which is why a missed
+cannot check. `summarised_at IS NULL` records unsent rows; enabled scope eligibility
+additionally controls delivery. This persisted ledger is why a missed
 cron run costs nothing and a caught-up one repeats nothing. Nothing is ever
 deleted.
+
+The schema shown above is the baseline. `db.connect()` adds `scope_status`,
+`scope_result` (JSON), `scope_input_hash`, `scope_checked_at`, `scope_attempts`,
+`scope_next_attempt_at`, `scope_error`, and `scope_retryable` idempotently.
+`runs.videos_excluded` also includes newly recorded scope exclusions.

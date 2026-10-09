@@ -39,6 +39,12 @@ Environment overrides: `VIDEO_SUMMARY_DB` (default
 `Asia/Hong_Kong`, and `feeds.json` may override it), `VIDEO_SUMMARY_TIMEOUT`,
 `VIDEO_SUMMARY_RETRIES`, `VIDEO_SUMMARY_PROXY`.
 
+Optional scope gate: configure `scope_filter` in feeds.json and supply
+`TYPESAFE_API_KEY` in the scheduled process environment. Python calls JEV with
+both title and description, asking a binary include/exclude Choice before
+fetching captions. The shipped gate is disabled until credentials are supplied.
+Details: [scope classification](references/scope-classification.md).
+
 ## One cron entry
 
 ```
@@ -57,6 +63,12 @@ and wakes nobody.
 ## The loop, per video
 
 `check` returns `videos`, oldest first. For **each** one, in order:
+
+These are the delivery candidates selected by Python. Do not summarize items
+from `feeds.candidates`, exclusions, or `classification_failures`, and do not
+override JEV's decision. Its `scope.reason` is a fixed explanation, not generated
+analysis of the video's content. An enabled gate never releases pending or
+failed scope decisions, even when the transcript grace period expires.
 
 1. **Read the transcript.** `transcript.path` is a file on disk; open it. It is
    a path and not text on purpose — a forty-minute video is forty thousand

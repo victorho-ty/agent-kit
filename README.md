@@ -7,12 +7,19 @@ Agent **profiles**; each bundle inside with deterministic Python package plus th
 
 ## Approach
 
-Code does the deterministic work: data ETL, maths, dedupe, charting, and state tracking.
+1. **Code does the deterministic work.**
 
-Model does the judgement work: deciding what is worth saying,
-writing it for the reader, answering questions about it, and the calls the tools
-deliberately refuse to guess at — an ambiguous listing, a peer set, a verdict a
-regex should not pretend to have.
+   Data ETL, maths, dedupe, charting, and state tracking.
+
+2. **System One (e.g. JEV) handles fast gating.**
+
+   Bounded classification questions before invoking an expensive LLM.
+
+3. **The LLM model does the judgement work and generation.**
+
+   Deciding what is worth saying, writing it for the reader, answering questions
+   about it, and the calls the tools deliberately refuse to guess at — an
+   ambiguous listing, a peer set, a verdict a regex should not pretend to have.
 
 Everything the model says about the data comes from a payload the tools returned.
 Model never computes a number.

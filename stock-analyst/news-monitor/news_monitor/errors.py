@@ -69,6 +69,10 @@ class FetchError(NewsMonitorError):
     error = "ERR_FETCH"
 
 
+class ScopeError(NewsMonitorError):
+    error = "ERR_SCOPE"
+
+
 class CandidateError(NewsMonitorError):
     """A url offered to ``add`` is unreachable, not XML, or already tracked."""
 

@@ -25,7 +25,7 @@ from urllib.parse import urlsplit
 from . import check as check_run
 from . import clock, db, gate, settings
 from .config import load_seeds, load_taxonomy
-from .errors import CandidateError, ExitCode, NewsMonitorError, NotFoundError
+from .errors import CandidateError, ConfigError, ExitCode, NewsMonitorError, NotFoundError
 
 
 def _emit(payload: dict) -> None:
@@ -254,13 +254,15 @@ def _cmd_mark(args, conn, now) -> int:
         raise NotFoundError("mark needs --item <id> (repeatable) or --all")
 
     if args.all:
-        wanted = [item.id for item in db.pending_items(conn)]
+        wanted = [item.id for item in db.pending_items(conn, classified=True)]
     else:
         wanted = []
         for reference in args.items:
             item = db.resolve_item(conn, reference)
             if item is None:
                 raise NotFoundError(f"no item matching {reference!r}", reference=reference)
+            if item.reported_at is None and not (item.scope and item.scope["is_target_scope"]):
+                raise ConfigError("item has not passed JEV scope classification", item_id=item.id)
             wanted.append(item.id)
 
     stamped = db.mark_reported(conn, wanted, now)

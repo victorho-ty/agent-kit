@@ -109,6 +109,14 @@ def summary_char_cap() -> int:
     return int(os.environ.get("NEWS_MONITOR_SUMMARY_CAP", DEFAULT_SUMMARY_CHAR_CAP))
 
 
+def typesafe_api_key() -> str | None:
+    return os.environ.get("TYPESAFE_API_KEY", "").strip() or None
+
+
+def scope_model() -> str:
+    return os.environ.get("NEWS_MONITOR_SCOPE_MODEL", "jev-latest")
+
+
 def gate() -> dict:
     return {
         "min_items": int(os.environ.get("NEWS_MONITOR_GATE_MIN_ITEMS", DEFAULT_GATE_MIN_ITEMS)),

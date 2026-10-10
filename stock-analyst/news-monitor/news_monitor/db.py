@@ -9,16 +9,17 @@ Three tables, three jobs:
   is a column here rather than a key in a file for exactly that reason.
 * **item** -- every headline ever seen. ``reported_at`` doubles as the ledger,
   so there is no second table to keep in sync: an item is pending when it has
-  not been stamped.
+  not been stamped and has not been excluded by JEV.
 * **runs** -- one row per check including the failures, which is the agent's
   whole triage surface. It never parses stdout.
 
-Nothing is ever deleted. A feed that has gone bad is disabled, not dropped --
-its items still name it, and its row keeps the record of why it went quiet.
+Newly classified out-of-scope items are discarded. A feed that has gone bad
+is disabled, not dropped; its row keeps the record of why it went quiet.
 """
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -62,8 +63,10 @@ CREATE TABLE IF NOT EXISTS item (
   sectors         TEXT,                   -- comma-joined hints from classify.py
   signals         TEXT,
   first_seen_at   TEXT NOT NULL,
-  reported_at     TEXT,                   -- the ledger; NULL means pending
-  run_id          INTEGER
+  reported_at     TEXT,                   -- reporting ledger; scope_target governs eligibility
+  run_id          INTEGER,
+  scope_target    INTEGER,
+  scope_detail    TEXT
 );
 
 CREATE INDEX IF NOT EXISTS item_pending ON item (reported_at);
@@ -98,6 +101,11 @@ def connect(path: Path | str | None = None) -> sqlite3.Connection:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(SCHEMA)
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(item)")}
+        for name, kind in (("scope_target", "INTEGER"), ("scope_detail", "TEXT")):
+            if name not in columns:
+                conn.execute(f"ALTER TABLE item ADD COLUMN {name} {kind}")
+        conn.commit()
     except (OSError, sqlite3.Error) as exc:
         raise DatabaseError(
             f"could not open the database at {resolved}: {exc}", path=str(resolved)
@@ -296,6 +304,8 @@ def pending_items(
     conn: sqlite3.Connection,
     feed_names: list[str] | None = None,
     limit: int | None = None,
+    *,
+    classified: bool = False,
 ) -> list[Item]:
     """Everything not yet handed over, oldest first so a backlog drains in order.
 
@@ -304,6 +314,7 @@ def pending_items(
     costs nothing and a caught-up one repeats nothing.
     """
     sql = "SELECT * FROM item WHERE reported_at IS NULL"
+    sql += " AND scope_target = 1" if classified else " AND (scope_target IS NULL OR scope_target = 1)"
     params: list = []
     if feed_names is not None:
         if not feed_names:
@@ -317,12 +328,28 @@ def pending_items(
     return [Item.from_row(row) for row in conn.execute(sql, params).fetchall()]
 
 
+def record_scope(conn: sqlite3.Connection, item_id: int, decision: dict) -> None:
+    """Cache eligible decisions; discard newly classified, unreported exclusions."""
+    if not decision["is_target_scope"]:
+        conn.execute(
+            "DELETE FROM item WHERE id = ? AND reported_at IS NULL AND scope_target IS NULL",
+            (item_id,),
+        )
+        conn.commit()
+        return
+    conn.execute(
+        "UPDATE item SET scope_target = ?, scope_detail = ? WHERE id = ?",
+        (int(decision["is_target_scope"]), json.dumps(decision), item_id),
+    )
+    conn.commit()
+
+
 def mark_reported(conn: sqlite3.Connection, item_ids: list[int], now: datetime) -> list[int]:
     """Stamp items as handed over. Returns the ones that were actually pending."""
     stamped = []
     for item_id in item_ids:
         cursor = conn.execute(
-            "UPDATE item SET reported_at = ? WHERE id = ? AND reported_at IS NULL",
+            "UPDATE item SET reported_at = ? WHERE id = ? AND reported_at IS NULL AND scope_target = 1",
             (now.isoformat(), item_id),
         )
         if cursor.rowcount:
@@ -332,8 +359,10 @@ def mark_reported(conn: sqlite3.Connection, item_ids: list[int], now: datetime) 
 
 
 def pending_count(conn: sqlite3.Connection) -> dict:
-    count = conn.execute("SELECT COUNT(*) FROM item WHERE reported_at IS NULL").fetchone()[0]
-    return {"pending_items": count}
+    row = conn.execute("""SELECT COUNT(*) AS pending,
+        SUM(CASE WHEN scope_target IS NULL THEN 1 ELSE 0 END) AS awaiting
+        FROM item WHERE reported_at IS NULL AND (scope_target IS NULL OR scope_target = 1)""").fetchone()
+    return {"pending_items": row["pending"], "awaiting_scope": row["awaiting"] or 0}
 
 
 def recent_items(
@@ -355,7 +384,7 @@ def recent_items(
         clauses.append("first_seen_at >= ?")
         params.append(since)
     if state == "pending":
-        clauses.append("reported_at IS NULL")
+        clauses.append("reported_at IS NULL AND scope_target = 1")
     elif state == "reported":
         clauses.append("reported_at IS NOT NULL")
     where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
@@ -369,7 +398,7 @@ def feed_counts(conn: sqlite3.Connection) -> dict[str, dict]:
     rows = conn.execute(
         """SELECT feed,
                   COUNT(*) AS items,
-                  SUM(CASE WHEN reported_at IS NULL THEN 1 ELSE 0 END) AS pending,
+                  SUM(CASE WHEN reported_at IS NULL AND (scope_target IS NULL OR scope_target = 1) THEN 1 ELSE 0 END) AS pending,
                   MAX(first_seen_at) AS latest_seen_at
              FROM item GROUP BY feed"""
     ).fetchall()

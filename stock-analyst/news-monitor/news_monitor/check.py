@@ -21,14 +21,15 @@ collected and the run finishes ``partial``.
 
 from __future__ import annotations
 
+import json
 import time as _time
 from datetime import datetime
 
-from . import db, fetch, settings
+from . import db, fetch, scope, settings
 from . import feed as feed_parser
 from .classify import classify
 from .config import Taxonomy
-from .errors import FetchError
+from .errors import ConfigError, FetchError, ScopeError
 
 
 def check(
@@ -42,11 +43,14 @@ def check(
     limit: int | None = None,
     delay: float | None = None,
     fetcher=None,
+    classifier=None,
 ) -> dict:
     """Poll ``feeds`` and return the payload the agent acts on."""
     fetcher = fetcher or fetch.get
     delay = settings.request_delay() if delay is None else delay
     limit = settings.max_per_check() if limit is None else limit
+    if limit < 1:
+        raise ConfigError("check limit must be a positive integer")
 
     run_id = None if dry_run else db.start_run(conn, now)
     reports: list[dict] = []
@@ -74,13 +78,14 @@ def check(
         if report.get("absorbed"):
             seeded_feeds.append({"feed": feed.name, "absorbed": report["absorbed"]})
 
-    items = (
-        []
-        if dry_run
-        else [item.to_dict() for item in db.pending_items(conn, limit=limit)]
-    )
+    scope_report = {"classified": 0, "included": 0, "excluded": 0, "excluded_items": [], "failures": []}
+    if not dry_run:
+        scope_report = _classify_pending(conn, limit, classifier)
+    items = [] if dry_run else [
+        item.to_dict() for item in db.pending_items(conn, limit=limit, classified=True)
+    ]
 
-    status = "partial" if failures else "ok"
+    status = "partial" if failures or scope_report["failures"] else "ok"
     if not dry_run:
         db.finish_run(
             conn, run_id, now, status,
@@ -89,8 +94,10 @@ def check(
                 "entries_seen": entries_seen,
                 "items_new": items_new,
                 "items_returned": len(items),
-                "errors": len(failures),
+                "errors": len(failures) + len(scope_report["failures"]),
             },
+            detail=json.dumps({"scope": {key: value for key, value in scope_report.items()
+                                        if key != "excluded_items"}}),
         )
 
     return {
@@ -106,6 +113,7 @@ def check(
         # stored, so the same story is counted again on every run that
         # re-fetches its feed -- a 304 does not re-count it.
         "excluded": items_excluded,
+        "scope_filter": scope_report,
         "items": items,
         **db.pending_count(conn),
     }
@@ -215,3 +223,40 @@ def _yield_status(feed, entries) -> str:
         return "zero_yield"
     return "ok"
 
+
+
+def _classify_pending(conn, limit, classifier) -> dict:
+    report = {"classified": 0, "included": 0, "excluded": 0, "excluded_items": [], "failures": []}
+    candidates = [item for item in db.pending_items(conn, limit=limit) if item.scope is None]
+    if not candidates:
+        return report
+    owned = classifier is None
+    if owned:
+        try:
+            classifier = scope.JevClassifier()
+        except ConfigError as exc:
+            report["failures"].append({"error": exc.error, "message": exc.message})
+            return report
+    try:
+        for item in candidates:
+            try:
+                decision = classifier(item.title, item.summary).to_dict()
+            except ScopeError as exc:
+                report["failures"].append({"item_id": item.id, "error": exc.error,
+                                           "message": exc.message, **exc.detail})
+                if exc.detail.get("stop_run"):
+                    break
+                continue
+            if not decision["is_target_scope"]:
+                report["excluded_items"].append({
+                    "title": item.title, "url": item.url,
+                    "reason": decision["reason"],
+                    "confidence_score": decision["confidence_score"],
+                })
+            db.record_scope(conn, item.id, decision)
+            report["classified"] += 1
+            report["included" if decision["is_target_scope"] else "excluded"] += 1
+    finally:
+        if owned:
+            classifier.close()
+    return report

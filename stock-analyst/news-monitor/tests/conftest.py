@@ -70,3 +70,20 @@ def fetcher():
         return fake_get
 
     return build
+
+
+@pytest.fixture(autouse=True)
+def offline_scope(monkeypatch):
+    from news_monitor import scope
+
+    original = scope.JevClassifier
+
+    class Classifier:
+        def __call__(self, title, summary):
+            return scope.Decision("include", 0.8, "jev-test")
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(scope, "JevClassifier", Classifier)
+    return original

@@ -9,6 +9,7 @@ object because they are one table.
 from __future__ import annotations
 
 import dataclasses
+import json
 
 
 def _split(value: str | None) -> list[str]:
@@ -112,6 +113,7 @@ class Item:
     signals: list[str]
     first_seen_at: str
     reported_at: str | None
+    scope: dict | None = None
 
     @classmethod
     def from_row(cls, row) -> "Item":
@@ -128,6 +130,7 @@ class Item:
             signals=_split(row["signals"]),
             first_seen_at=row["first_seen_at"],
             reported_at=row["reported_at"],
+            scope=json.loads(row["scope_detail"]) if row["scope_detail"] else None,
         )
 
     def to_dict(self) -> dict:
@@ -143,6 +146,7 @@ class Item:
             "signals": self.signals,
             "first_seen_at": self.first_seen_at,
             "reported_at": self.reported_at,
+            "scope": self.scope,
         }
 
 

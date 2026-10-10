@@ -1,12 +1,13 @@
 ---
 name: news-monitor
-description: Watch a database of finance RSS feeds, and report every headline that has not been reported before. Use when the news check cron fires, when asked what the wires have carried, when the operator asks to add, pause or list a news source, when asked whether a story has already been seen, and when the watcher has gone quiet and needs triage.
+description: Watch a database of finance RSS feeds, and report in-scope headlines that have not been reported before. Use when the news check cron fires, when asked what the wires have carried, when the operator asks to add, pause or list a news source, when asked whether a story has already been seen, and when the watcher has gone quiet and needs triage.
 ---
 
 # News monitor
 
 Deterministic Python polls the feeds, remembers every headline it has ever seen,
-and hands back only the ones that have never been reported. You own two jobs:
+and hands back only in-scope news that has never been reported. TypeSafe JEV
+classifies the headline and RSS summary in Python before you receive it. You own two jobs:
 deciding what each unseen headline means, and deciding which of them belong in
 the vault. Which sources are watched is the operator's decision, not yours.
 
@@ -32,6 +33,10 @@ cd ~/projects/hermes/profile-stock-analyst/news-monitor && .venv/bin/python -m n
 Every command prints one JSON object on stdout. Parse it. Never repair a link by
 hand, never convert a date, and never describe a story the tools did not return.
 
+JEV requires `TYPESAFE_API_KEY` in the inherited shell environment.
+`NEWS_MONITOR_SCOPE_MODEL` defaults to `jev-latest`. The exact operator prompt
+is shipped in `news_monitor/config/scope_prompt.txt`.
+
 Environment overrides: `NEWS_MONITOR_DB` (default
 `~/.local/share/hermes-stock-analyst/news_monitor.db`), `NEWS_MONITOR_TZ`,
 `NEWS_MONITOR_TIMEOUT`, `NEWS_MONITOR_RETRIES`, and `NEWS_MONITOR_CONTACT` — an email address, needed only for government feeds
@@ -44,7 +49,7 @@ and unset by default. See the triage section.
 ```
 
 Hourly, five past. `check` fetches every enabled feed, stores what is new and
-returns what has never been reported — often nothing, which is the normal case
+returns in-scope news that has never been reported — often nothing, which is the normal case
 and warrants no message at all.
 
 The schedule and the ledger are independent. A missed run needs no catch-up: the
@@ -54,7 +59,9 @@ column, not a time window.
 ## The loop, per run
 
 1. **`news-monitor check`.** Read `items` — oldest first, already deduplicated
-   across feeds.
+   across feeds and classified as in scope by JEV. `scope` carries the decision
+   and confidence. Its `reason` is a fixed label, not a generated explanation.
+   Report only `check.items`; unfiltered `items` is audit history.
 2. **Bucket them.** Each item carries `category` (the feed's own) and
    `sector_hints` / `signals` (matched keywords). Group by what the desk cares
    about — rates and inflation together, one name's news together — not by
@@ -189,6 +196,14 @@ case), `zero_yield`, `error`.
 nothing where it used to produce entries — a section retired, a url that changed
 meaning, a paywall now serving an empty shell. Left alone it reports "nothing
 new" forever and looks exactly like a quiet week.
+
+`scope_filter.failures` means classification withheld some pending news;
+check the error and retry after fixing it. A missing key never passes news
+through. `awaiting_scope` counts these unclassified items. Newly classified out-of-scope stories
+are discarded. `scope_filter.excluded_items` provides a brief log in the JSON
+output; do not report those stories. No exclusion fingerprint is retained, so
+an excluded story can be classified again when it reappears in a fetched feed. Dry runs
+and absorbed back catalogues do not call JEV. See `references/cli.md`.
 
 A single failed fetch is not worth mentioning; check `consecutive_failures` in
 `feeds` first.

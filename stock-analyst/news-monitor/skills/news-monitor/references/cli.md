@@ -55,7 +55,7 @@ news-monitor check --limit 10
 }
 ```
 
-`status` is `ok` or `partial` (at least one feed failed), or `skipped` with a
+`status` is `ok` or `partial` (a feed or scope classification failed), or `skipped` with a
 `reason` when nothing is enabled.
 
 Per-feed `status`:
@@ -224,3 +224,46 @@ news-monitor runs --limit 5
 One row per check: `started_at`, `finished_at`, `status`, `feeds_checked`,
 `entries_seen`, `items_new`, `items_returned`, `errors`. This is the liveness
 surface — check it first when asked why nothing has come up.
+
+## JEV scope classification
+
+`check` uses TypeSafe JEV before returning news for operator reporting or LLM
+processing. Set `TYPESAFE_API_KEY` in the Hermes profile environment inherited
+by the shell. The key is read at runtime and never written to the ledger.
+`NEWS_MONITOR_SCOPE_MODEL` optionally overrides the default `jev-latest`.
+
+The exact operator prompt is shipped in `news_monitor/config/scope_prompt.txt`
+and sent unchanged as Choice instructions. News is supplied separately as title
+and RSS summary; no article fetch is performed. JEV is a typed decision model,
+so it cannot generate the prompt's free-text explanation. Python maps its
+include/exclude choice and confidence into `scope.is_target_scope`,
+`scope.reason`, and `scope.confidence_score`. `reason_source` explicitly marks
+the reason as a fixed classification label, not a generated topic explanation.
+There is no confidence threshold beyond JEV's chosen option.
+
+Existing taxonomy exclusions run first. New stories are deduplicated before
+classification. In-scope decisions persist across checks, including 304s.
+Newly classified exclusions are discarded from the item table. Brief records
+(title, URL, reason and confidence) appear only in `scope_filter.excluded_items`
+in the command's JSON output for Hermes; they are not stored in `runs.detail`.
+No exclusion fingerprint is retained, so a later fetched document containing
+the same excluded story can trigger classification again. Existing stored
+history is left untouched. Missing
+keys, API failures and invalid answers withhold affected news and leave it
+pending for retry. `status: partial` and `scope_filter.failures` expose these
+failures; `runs.detail` retains them. Authentication/configuration errors stop
+further calls for that run. Errors contain no API response body or key.
+
+Each check examines up to `--limit` pending items (default 40), which bounds
+classification work; exclusions can make the returned batch smaller. The SDK
+uses a 20-second request timeout, at most three attempts, and a 60-second retry
+budget per story. No calls are made for absorbed history or dry runs.
+`pending_items` includes news awaiting a decision; `awaiting_scope` counts it.
+`items --pending` and `mark --all` cover only classified, in-scope news.
+`items` without `--pending` is history and may include unclassified rows
+or exclusions retained by older versions: never use it as a reporting batch.
+
+Existing databases gain two nullable columns on connection. History is retained;
+previously pending stories receive classification on subsequent checks.
+
+API contract: https://docs.typesafe.ai/api

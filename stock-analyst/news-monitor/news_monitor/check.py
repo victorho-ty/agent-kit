@@ -96,8 +96,10 @@ def check(
                 "items_returned": len(items),
                 "errors": len(failures) + len(scope_report["failures"]),
             },
-            detail=json.dumps({"scope": {key: value for key, value in scope_report.items()
-                                        if key != "excluded_items"}}),
+            detail=json.dumps({"scope": {
+                **{key: value for key, value in scope_report.items() if key != "excluded_items"},
+                "excluded_subjects": [item["title"] for item in scope_report["excluded_items"]],
+            }}),
         )
 
     return {

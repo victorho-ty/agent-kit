@@ -201,7 +201,10 @@ new" forever and looks exactly like a quiet week.
 check the error and retry after fixing it. A missing key never passes news
 through. `awaiting_scope` counts these unclassified items. Newly classified out-of-scope stories
 are discarded. `scope_filter.excluded_items` provides a brief log in the JSON
-output; do not report those stories. No exclusion fingerprint is retained, so
+output; do not report those stories. `runs.detail.scope.excluded_subjects`
+retains only the headlines excluded by JEV for later inspection. Keyword
+exclusions are counted separately and are not included in that list.
+No exclusion fingerprint is retained, so
 an excluded story can be classified again when it reappears in a fetched feed. Dry runs
 and absorbed back catalogues do not call JEV. See `references/cli.md`.
 

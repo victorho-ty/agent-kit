@@ -181,7 +181,10 @@ Existing taxonomy exclusions run first. New stories are deduplicated before
 classification. In-scope decisions persist across checks, including 304s.
 Newly classified exclusions are discarded from the item table. Brief records
 (title, URL, reason and confidence) appear only in `scope_filter.excluded_items`
-in the command's JSON output for Hermes; they are not stored in `runs.detail`.
+in the command's JSON output for Hermes. Only excluded headlines are retained
+in `runs.detail.scope.excluded_subjects`; excluded URLs, summaries, reasons and
+confidence are not persisted there. This list covers JEV exclusions, not the
+keyword exclusions that happen before insertion. Older runs are unchanged.
 No exclusion fingerprint is retained, so a later fetched document containing
 the same excluded story can trigger classification again. Existing stored
 history is left untouched. Missing

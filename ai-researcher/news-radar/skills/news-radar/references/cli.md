@@ -1,220 +1,124 @@
-# Command surface and JSON shapes
+# Staged CLI and JSON contracts
 
-Every command prints one indented JSON object on stdout. Success is
-`{"ok": true, ...}` and exit 0. Failure is:
+Each command prints one JSON object. Exit 0 means a successful operation; partial
+search/evidence results carry `status: partial` and explicit failures. An entirely
+failed collection exits 20. Invalid input exits 10. Unknown items/drafts exit 30.
+Read failures even when `ok` is true. JSON inputs are capped at 250000 characters.
+`--input -` reads stdin. Do not put API keys in these files.
 
-```json
-{
-  "ok": false,
-  "error": "ERR_CONFIG",
-  "exit_code": 10,
-  "message": "source 'verge-ai': category 'Ai' is not declared in 'categories' (['ai', 'world'])",
-  "detail": {}
-}
-```
+## Research and ingestion
 
-| code | error | meaning |
-|---|---|---|
-| 0 | — | fine |
-| 10 | `ERR_CONFIG` | `sources.json` is malformed, or names a source or category that does not exist |
-| 11 | `ERR_DB` | the database could not be opened or written |
-| 20 | `ERR_FETCH` | the only source asked for could not be reached |
-| 21 | `ERR_BROWSER` | a source needs `"render": "browser"` and Chromium is not usable |
-| 30 | `ERR_NOT_FOUND` | no item with that id |
+`research` returns `as_of`, `window_start`, `lookback_days` and five `jobs`, each with
+`source`, `category`, `query`, `reference_url` and `max_items`. `reference_url` identifies
+the vendor; it is not an article to ingest. `research --topic "keywords"` returns
+community jobs. Commands themselves make no search-provider calls.
 
-A *per-source* failure during a scan is none of these. It goes into
-`source_failures`, the other sources still run, and the command exits 0.
+The vendor plan also returns `feed_jobs` and `feed_count` for enabled non-search
+sources. For each feed job, run `scan --source SOURCE`; it stores new entries directly
+in the shared ledger, so do not also ingest the scan output. `count` counts search
+jobs only. Community plans return no feed jobs. Copilot is the default RSS source;
+its initial scan seeds existing history silently, and subsequent arrivals become
+pending. Feed items use the same shortlist/evidence/briefing/HTML delivery stages.
 
-## scan
-
-Collects. Never reports anything.
-
-```bash
-news-radar scan                             # every enabled source
-news-radar scan --source verge-ai           # repeatable
-news-radar scan --category ai               # repeatable
-news-radar scan --dry-run                   # show what was caught; write nothing
-news-radar scan --seed                      # absorb what is published now, silently
-news-radar scan --ignore-throttle           # fetch even inside min_interval_minutes
-```
+Pass actual search metadata, for example:
 
 ```json
 {
-  "ok": true,
-  "status": "ok",
-  "run_id": 41,
-  "dry_run": false,
-  "now": "2026-08-11T14:00:00+08:00",
-  "sources": [
+  "results": [
     {
-      "source": "verge-ai",
-      "category": "ai",
-      "status": "ok",
-      "seeding": false,
-      "items_seen": 10,
-      "items_new": 2,
-      "excluded": 0,
-      "candidates": []
-    }
-  ],
-  "source_failures": [],
-  "totals": {"sources_scanned": 5, "items_seen": 99, "items_new": 4,
-             "items_excluded": 1, "errors": 0},
-  "pending_items": 4
+      "source": "anthropic",
+      "items": [{
+        "title": "Title copied from a search result",
+        "url": "https://www.anthropic.com/news/article-slug",
+        "snippet": "Search-provider snippet, not an agent-written summary",
+        "published_text": null
+      }]
+    },
+    { "source": "aws", "items": [] },
+    { "source": "openai", "error": "Search tool unavailable for this query" }
+  ]
 }
 ```
 
-Run `status` is `ok` | `partial` | `skipped` | `error`. Per-source `status` is
-`ok` | `unchanged` (304) | `throttled` | `zero_yield` | `error`. A throttled
-source also carries `next_eligible`.
+This is a shape illustration, not news to ingest. Successful records require `items`.
+Failed records use `error`; empty results are not errors. Each source may appear once
+per input. Ingest validates the whole document before writing. It canonicalizes links,
+removes configured exclusions, and deduplicates by source plus article URL even when
+a title changes. Newly discovered search stories are pending immediately, including
+on the first run. Previously reported or dismissed URLs are not reintroduced.
 
-`candidates` is populated only by `--dry-run`, and carries `title`, `url`,
-`summary`, `date_text`, `source_domain` and `would_digest`.
+## Selection and evidence
 
-`source_failures` entries carry `source`, `reason` (`fetch_failed` |
-`extract_failed` | `zero_yield`) and `message`.
+`shortlist --limit 100` returns category `sections` with clustered `stories` containing
+`ids`, `title`, `url`, `sources` (publisher domains), `vendors` (configured topics),
+`published_text` and `snippets` tied to IDs. `count` is items returned, not story count.
+`pending_items`, `has_more` and `legacy_pending_items` describe the queue. Limit 1–500.
 
-`pending_items` is how a scheduler decides whether running a digest is worth it.
+`evidence --id 1 --id 2` returns `evidence` records with `item_id`, resolved `url`,
+`title`, `published_text`, `text`, `fetched_at`, and `cached`. Fresh fetches also report
+`content_root` and `truncated`. Failed items appear under `failures`; they are not
+converted into empty evidence. `--refresh` replaces cached evidence only after a
+successful fetch. Per call: at most `detail_budget` IDs, each response at most 3 MB,
+and readable text at most 12000 characters. Python extracts article/main/body text,
+not PDF or JavaScript-rendered content. Inspect login/bot pages and truncation.
 
-## digest
+## Briefing input
 
-Reports. This is the only command that produces something to send.
-
-```bash
-news-radar digest                    # read-only peek; stamps nothing
-news-radar digest --commit           # stamp them as sent, then return them
-news-radar digest --category ai      # repeatable
-news-radar digest --limit 30
-news-radar digest --text             # also include a ready-to-send 'body' string
-```
+`briefing --input draft.json` expects exactly these top-level keys:
 
 ```json
 {
-  "ok": true,
-  "as_of": "2026-08-11T18:00:00+08:00",
-  "since": "2026-08-11T09:00:00+08:00",
-  "count": 14,
-  "stories": 11,
-  "committed": 14,
-  "sections": [
-    {
-      "category": "ai",
-      "label": "AI",
-      "stories": [
-        {
-          "ids": [88, 91, 94],
-          "title": "OpenAI releases GPT-X",
-          "url": "https://www.theverge.com/2026/08/11/openai-gpt-x",
-          "sources": ["theverge.com", "techcrunch.com", "arstechnica.com"],
-          "summary": "The model is available today.",
-          "published_text": "Mon, 11 Aug 2026 09:00:00 +0800"
-        }
-      ]
-    }
-  ],
-  "totals": {"items": 14, "stories": 11, "sources": 6, "categories": 3}
+  "highlights": [{"text": "A supported highlight", "item_ids": [1]}],
+  "stories": [{
+    "item_ids": [1],
+    "headline": "A supported headline",
+    "summary": "A summary supported by item 1's fetched article text.",
+    "urls": ["https://www.anthropic.com/news/article-slug"]
+  }],
+  "community": []
 }
 ```
 
-`sections` is in the order the `categories` list declares. A category with
-nothing new is omitted, not printed empty. `since` is the oldest pending item's
-`first_seen_at`, or `null` when there is nothing.
+Community entries contain `item_ids`, `summary` and `urls`, without a headline or
+why-it-matters field. Stories no longer accept `why_it_matters`; include a short
+implication in `summary` only when useful. Highlights are single-line bullets up to
+160 characters. Headlines are at most 100 characters, summaries at most 220, and a
+story's headline plus summary at most 280 (excluding source URLs). Community summaries
+are also capped at 220. Multiline text and overlong drafts are rejected for the editor
+to shorten; Python does not truncate claims. Use community-source IDs there, not vendor articles. At most
+three highlights, three community entries and `detail_budget` vendor stories.
+Each entry needs 1–3 distinct URLs belonging to its own fetched evidence; at least
+one must be a resolved evidence URL. Neither an ID nor a URL can appear in multiple entries.
+Highlights must refer to included vendor stories. All cited IDs must be pending
+and belong to enabled sources. Every ID needs successful cached article evidence.
 
-A section with `"category": "uncategorised"` and a `note` holds items whose
-source has been removed from `sources.json` — they surface instead of vanishing.
+Output contains `briefing_id`, `created_at`, `committed_at`, `content`, `body` and
+Python-computed `totals`. Vendor labels and publication text are added from the
+ledger. No semantic fact-checking is claimed. An empty `stories` list is refused;
+when nothing merits reporting, do not draft. The text body has Highlights, Stories
+and optional Community Pulse, with one bullet per entry and all its URLs inline. The
+HTML uses the same concise content in a responsive, styled document: a dark header,
+teal highlights, readable story rows, and clickable source links. It works offline
+without external fonts, scripts or styles. Retained older drafts remain readable;
+their separate why-it-matters field is no longer rendered. `--html NEW_PATH` exports escaped HTML
+without overwriting another file. The staged SKILL requires `--html` on every briefing
+creation or recovery; choose a fresh absolute path with an existing parent directory.
+Successful export adds `html_path` to the result. `briefing --id N --html NEW_PATH`
+retrieves a retained draft and exports its attachment for retry.
 
-`count` is items; `stories` is what a reader sees after clustering. Without
-`--commit`, `committed` is 0 and nothing is stamped.
+## Delivery state
 
-## sources
+After confirmed delivery of both the message and HTML document attachment:
+`commit --briefing N`. An export or attachment-delivery failure leaves the draft
+uncommitted; retry only the missing delivery component. Only IDs included in that draft are
+stamped. A repeated acknowledgement returns `already_committed: true` with zero new
+commits. A draft whose items were reported/dismissed elsewhere is stale and refused.
 
-```bash
-news-radar sources
-news-radar sources --all      # include disabled
-```
+`dismiss --id N --reason "duplicate coverage"` records an editorial disposition and
+removes a pending item from the queue without deleting it. Unselected items stay
+pending unless explicitly dismissed. Old records are never deleted by this workflow.
 
-Returns the config as loaded — `timezone`, `request_delay_seconds`,
-`detail_budget`, `cluster_threshold`, `categories`, `exclude` — plus one entry
-per source combining its config with its health: `seeded`, `last_ok_at`,
-`consecutive_failures`, `last_error`, `recent_yield`, `next_eligible`.
-
-This is also the config validator. A malformed `sources.json` fails here with
-`ERR_CONFIG` and the offending field named.
-
-## items
-
-```bash
-news-radar items --limit 20
-news-radar items --category ai
-news-radar items --source verge-ai
-news-radar items --since 2026-08-01
-```
-
-Newest first. Each row: `id`, `source`, `source_domain`, `category`, `title`,
-`url`, `summary`, `date_text`, `first_seen_at`, `digested_at`. Unclustered —
-this is the raw record, not the digest.
-
-## runs
-
-```bash
-news-radar runs --limit 5
-```
-
-One row per scan, including the failures: `started_at`, `finished_at`, `status`,
-`sources_scanned`, `items_seen`, `items_new`, `items_excluded`, `errors`,
-`detail`. Plus the current `pending_items`.
-
-## SQLite schema (read-only reference)
-
-```sql
-CREATE TABLE site_state (
-  source                TEXT PRIMARY KEY,
-  first_seen_at         TEXT NOT NULL,
-  last_scan_at          TEXT,          -- what the per-source throttle reads
-  last_ok_at            TEXT,
-  etag                  TEXT,
-  last_modified         TEXT,
-  consecutive_failures  INTEGER NOT NULL DEFAULT 0,
-  last_error            TEXT,
-  seeded                INTEGER NOT NULL DEFAULT 0,
-  recent_yield          INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE TABLE item (
-  id             INTEGER PRIMARY KEY,
-  source         TEXT NOT NULL,
-  item_key       TEXT NOT NULL,   -- sha1(source|canonical url|folded title)
-  url            TEXT NOT NULL,
-  title          TEXT NOT NULL,
-  summary        TEXT,
-  detail_text    TEXT,
-  date_text      TEXT,            -- the source's own words, never parsed
-  source_domain  TEXT NOT NULL,   -- the digest's label
-  first_seen_at  TEXT NOT NULL,
-  digested_at    TEXT,            -- the ledger; NULL means pending
-  run_id         INTEGER,
-  UNIQUE (source, item_key)
-);
-
-CREATE TABLE runs (
-  id               INTEGER PRIMARY KEY,
-  started_at       TEXT NOT NULL,
-  finished_at      TEXT,
-  status           TEXT NOT NULL,   -- ok | partial | skipped | error
-  sources_scanned  INTEGER NOT NULL DEFAULT 0,
-  items_seen       INTEGER NOT NULL DEFAULT 0,
-  items_new        INTEGER NOT NULL DEFAULT 0,
-  items_excluded   INTEGER NOT NULL DEFAULT 0,
-  errors           INTEGER NOT NULL DEFAULT 0,
-  detail           TEXT
-);
-```
-
-**There is no category column on `item`, and no cluster table.** The category is
-read from the source's current config at digest time, so recategorising applies
-to everything not yet sent. Clusters are computed per digest and never stored,
-because membership depends on which items happen to be pending together.
-
-**There is no `digests` table either.** An item is pending when `digested_at IS
-NULL`, which is the whole reason `scan` and `digest` can run on unrelated
-schedules. Nothing is ever deleted.
+`sources --all`, `items --source anthropic --limit 20`, and `runs --limit 3` inspect
+configuration, retained items, and research ingestion health. Feed `scan` and legacy
+`digest` remain supported for explicit feed configurations, but refuse the new default
+search workflow so old cron commands cannot silently stamp unreviewed discoveries.

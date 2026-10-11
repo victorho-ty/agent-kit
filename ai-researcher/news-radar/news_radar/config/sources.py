@@ -1,17 +1,8 @@
-"""What is scanned, and which section of the digest it belongs to.
+"""Search topics, optional feed sources, and deterministic workflow limits.
 
-Two things are deliberately absent:
-
-**There is no scan window.** Quiet hours are a policy about when to bother a
-person, and the scan talks to nobody -- only the digest does -- so the scan can
-run continuously and the digest's own schedule decides when anyone is
-interrupted.
-
-**There is no global interval either.** The cron entry *is* the cadence;
-restating it here would create two sources of truth that drift silently. What
-cron cannot express is per-source politeness, so that is the one knob provided:
-``min_interval_minutes`` is a floor on how often a single source may be
-fetched, not a schedule.
+Search jobs are executed by Hermes using the profile's model and available web
+search. Source categories control the shortlist; no model provider or scheduler
+is encoded in the configuration. Feed-only configs retain per-source throttling.
 """
 
 from __future__ import annotations
@@ -79,6 +70,7 @@ class Source:
     render: str = "static"
     list_selector: str | None = None
     fields: dict[str, str] = dataclasses.field(default_factory=dict)
+    query: str | None = None
     item_pattern: str | None = None
     follow_detail: bool = False
     detail_selector: str | None = None
@@ -100,6 +92,18 @@ class Source:
             raise ConfigError(f"source {self.name!r}: kind must be one of {SOURCE_KINDS}, got {self.kind!r}")
         if self.render not in RENDER_MODES:
             raise ConfigError(f"source {self.name!r}: render must be one of {RENDER_MODES}, got {self.render!r}")
+        if self.kind == "search":
+            if not isinstance(self.query, str) or not self.query.strip():
+                raise ConfigError(f"source {self.name!r}: kind 'search' needs a query")
+            from string import Formatter
+
+            try:
+                fields = {name for _, name, _, _ in Formatter().parse(self.query) if name is not None}
+                if fields - {"today", "month_year", "topic"}:
+                    raise ValueError("supported placeholders are today, month_year, topic")
+                self.query.format(today="date", month_year="month", topic="story")
+            except (ValueError, KeyError, IndexError, AttributeError) as exc:
+                raise ConfigError(f"source {self.name!r}: invalid query: {exc}") from exc
         if self.kind == "html":
             if not self.list_selector:
                 raise ConfigError(f"source {self.name!r}: kind 'html' needs a list_selector")
@@ -119,6 +123,7 @@ class Source:
             "category": self.category,
             "kind": self.kind,
             "render": self.render,
+            "query": self.query,
             "follow_detail": self.follow_detail,
             "min_interval_minutes": self.min_interval_minutes,
             "max_items": self.max_items,
@@ -138,6 +143,7 @@ class RadarConfig:
     detail_budget: int
     cluster_threshold: float
     path: Path
+    lookback_days: int = 1
 
     def tzinfo(self) -> ZoneInfo:
         return ZoneInfo(self.timezone_name)
@@ -278,6 +284,10 @@ def load_config(path: Path | str | None = None) -> RadarConfig:
     if not 0.0 < threshold <= 1.0:
         raise ConfigError(f"{path}: cluster_threshold must be between 0 and 1, got {threshold}")
 
+    lookback_days = raw.get("lookback_days", 1)
+    if type(lookback_days) is not int or not 1 <= lookback_days <= 30:
+        raise ConfigError("lookback_days must be an integer between 1 and 30")
+
     return RadarConfig(
         timezone_name=timezone_name,
         categories=categories,
@@ -287,6 +297,7 @@ def load_config(path: Path | str | None = None) -> RadarConfig:
         detail_budget=int(raw.get("detail_budget", DEFAULT_DETAIL_BUDGET)),
         cluster_threshold=threshold,
         path=path,
+        lookback_days=lookback_days,
     )
 
 

@@ -1,88 +1,51 @@
-// Every source needs a "category", and that category must be declared in the
-// "categories" list below. The order of that list is the order of sections in
-// the digest -- put what matters to you first.
-//
-// A source is not trusted until it has been checked against the live feed:
-//     news-radar scan --source <name> --dry-run
-//
-// Field reference: skills/news-radar/references/source-config.md
+// Search discovery is performed by Hermes; Python never calls an LLM.
+// Vendor queries follow kobyal/ai-latest-briefing at commit 22774b5.
 {
   "timezone": "Asia/Hong_Kong",
   "request_delay_seconds": 2.0,
   "detail_budget": 10,
+  "lookback_days": 1,
   "cluster_threshold": 0.7,
-
   "categories": [
     { "name": "ai", "label": "AI" },
-    { "name": "robotics", "label": "Physical AI" }
+    { "name": "community", "label": "Community Pulse" }
   ],
-
-  // Dropped outright, whatever else the item says.
-  "exclude": ["sponsored", "advertisement", "newsletter signup", "techcrunch disrupt", "White House"],
-
+  "exclude": ["sponsored", "advertisement", "newsletter signup"],
   "sources": [
     {
       "name": "github-copilot", "category": "ai", "kind": "rss",
-      "url": "https://github.blog/changelog/label/copilot/feed/",
-      "max_items": 30, "enabled": true
+      "url": "https://github.blog/changelog/label/copilot/feed/", "max_items": 15
     },
     {
-      "name": "llm-news", "category": "ai", "kind": "html",
-      "url": "https://llm-stats.com/ai-news",
-      "render": "browser",
-      "list_selector": "#llm-news div.space-y-3 > div",
-      "fields": {
-        "title": "h3",
-        "summary": "p"
-      },
-      "min_interval_minutes": 180, "max_items": 30, "enabled": true
+      "name": "anthropic", "category": "ai", "kind": "search",
+      "url": "https://www.anthropic.com/news",
+      "query": "Anthropic Claude latest news {month_year}", "max_items": 10
     },
     {
-      "name": "nvidia-robotics", "category": "robotics", "kind": "rss",
-      "url": "https://blogs.nvidia.com/blog/category/robotics/feed/",
-      "min_interval_minutes": 360, "max_items": 20, "enabled": true
+      "name": "openai", "category": "ai", "kind": "search",
+      "url": "https://openai.com/news/",
+      "query": "OpenAI latest release {month_year}", "max_items": 10
     },
     {
-      "name": "field-ai", "category": "robotics", "kind": "html", "render": "static",
-      "url": "https://fieldai.com/news",
-      "list_selector": ".w-dyn-item",
-      "fields": {
-        "title": "h3",
-        "link": "a[href^='/news/']@href",
-        "date": ".news-card-info .label:not(.news-label)"
-      },
-      "min_interval_minutes": 720, "max_items": 10, "enabled": true
+      "name": "google", "category": "ai", "kind": "search",
+      "url": "https://blog.google/technology/ai/",
+      "query": "Google Gemini AI latest update {month_year}", "max_items": 10
+    },
+    {
+      "name": "azure", "category": "ai", "kind": "search",
+      "url": "https://azure.microsoft.com/en-us/blog/",
+      "query": "Microsoft Azure OpenAI latest announcement {month_year}", "max_items": 10
+    },
+    {
+      "name": "hacker-news", "category": "community", "kind": "search",
+      "url": "https://news.ycombinator.com/",
+      "query": "site:news.ycombinator.com {topic} {today}", "max_items": 5
+    },
+    {
+      "name": "reddit", "category": "community", "kind": "search",
+      "url": "https://www.reddit.com/r/LocalLLaMA/",
+      "query": "site:reddit.com/r/MachineLearning OR site:reddit.com/r/LocalLLaMA {topic} {today}",
+      "max_items": 5
     }
-
-  //    A source that should not be hit as often as the rest. min_interval_minutes
-  //    is a floor, not a schedule: the hourly cron still runs, and this source is
-  //    reported as "throttled" and skipped until its floor has passed. Use it for
-  //    slow personal blogs and for anything with "render": "browser".
-  //    {
-  //      "name": "slow-blog",
-  //      "category": "ai",
-  //      "url": "https://example.dev/feed",
-  //      "kind": "rss",
-  //      "min_interval_minutes": 360,
-  //      "enabled": false
-  //    },
-  //    An outlet with no feed. Selectors are a last resort -- they break on a
-  //    redesign, which a feed cannot. Verify with --dry-run before enabling.
-  //    {
-  //      "name": "example-outlet",
-  //      "category": "world",
-  //      "url": "https://news.example.com/latest",
-  //      "kind": "html",
-  //      "render": "static",
-  //      "list_selector": "article.story",
-  //      "fields": {
-  //        "title": "h2 a",
-  //        "link": "h2 a@href",
-  //        "summary": "p.standfirst",
-  //        "date": "time"
-  //      },
-  //      "max_items": 25,
-  //      "enabled": false
-  //    }
   ]
 }

@@ -59,6 +59,27 @@ CREATE TABLE IF NOT EXISTS item (
   UNIQUE (source, item_key)
 );
 
+CREATE TABLE IF NOT EXISTS evidence (
+  item_id INTEGER PRIMARY KEY REFERENCES item(id),
+  url TEXT NOT NULL,
+  title TEXT,
+  published_text TEXT,
+  text TEXT NOT NULL,
+  fetched_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS review (
+  item_id INTEGER PRIMARY KEY REFERENCES item(id),
+  disposition TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  reviewed_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS briefing (
+  id INTEGER PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  content TEXT NOT NULL,
+  committed_at TEXT
+);
+
 CREATE INDEX IF NOT EXISTS item_pending ON item (digested_at);
 CREATE INDEX IF NOT EXISTS item_source_seen ON item (source, first_seen_at);
 
@@ -218,6 +239,7 @@ def insert_item(
     *,
     run_id: int | None = None,
     digested: bool = False,
+    commit: bool = True,
 ) -> int:
     """Store a newly seen candidate.
 
@@ -243,7 +265,8 @@ def insert_item(
             "run_id": run_id,
         },
     )
-    conn.commit()
+    if commit:
+        conn.commit()
     return cursor.lastrowid
 
 

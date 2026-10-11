@@ -1,150 +1,91 @@
-# news-radar — design
+# news-radar design
 
-Why the bundle is shaped this way. Written alongside the implementation; where
-this document and the code disagree, the code is right and this file is a bug.
+## Ownership
 
-## 1. The scan and the digest are two programs
+One Hermes agent follows a staged skill using the profile's current model. It owns
+web discovery, editorial selection, optional community research, interpretation and
+writing. Python owns deterministic planning, ingestion, canonical URLs, clustering,
+article extraction, output validation, rendering and retained state. There is no
+Python model call, JEV gate, ADK runtime or provider-specific search integration.
 
-`scan` collects and never speaks. `digest` speaks and never collects. They are
-wired to separate cron entries, and the coupling between them is a **column**,
-not a clock: `digest` takes every item with `digested_at IS NULL`.
+The default vendor search queries follow ai-latest-briefing revision 22774b5; the
+implementation is independent. Unlike that application, every vendor need not have
+a story, Hebrew translation is not mandatory, citations cannot be substituted with
+unrelated links, and a fresh daily execution does not discard dedupe history.
 
-Everything good follows from that:
+## Discovery and identity
 
-- a missed scan needs no catch-up, because "new" is `item_key` against the table
-  rather than a time range;
-- a missed digest loses nothing and merely makes the next one longer;
-- either cadence can change without touching the other, which is exactly why no
-  interval appears in the config.
+`research` expands dates at invocation using the configured timezone. It returns
+vendor search jobs plus targeted scan jobs for enabled feeds, or HN/Reddit jobs when
+a topic is supplied. Copilot RSS collection uses a targeted scan, then joins the
+same shortlist, evidence, summarization and HTML-delivery stages. Hermes records actual search
+metadata; Python does not pretend a model's generated summary is source evidence.
+The entire input is validated before ingestion writes. An empty result is a success;
+a failed query is recorded as a failure. Omitted jobs are not claimed as completed.
 
-The freshness argument for scanning often is not really about freshness. **Many
-feeds only expose the last N entries.** A source publishing 15 items between two
-scans of a feed that holds 10 loses five permanently — they were never seen, so
-nothing downstream can recover them. That is the strongest reason the scan runs
-on its own frequent schedule.
+Search identity is source plus canonical article URL, so tracking changes and
+headline rewrites do not reintroduce a reported story. Exclusions run before storage.
+First imports are pending rather than silently seeded: search results are bounded
+and the editor controls whether an older result merits publication or dismissal.
+The existing feed scanner keeps its own URL/title identity and cold-start rules.
 
-## 2. No window, no interval, one floor
+## Shortlisting and evidence
 
-Quiet hours are a policy about when to bother a person, and a cron expression
-states that badly — but the scan bothers nobody, so it needs no such policy at
-all. The digest's own cron entries decide when anyone is interrupted.
+The shortlist includes current enabled sources only and preserves the existing
+category-scoped headline-overlap clustering. It exposes IDs and snippets for compact
+batch comparison by Hermes. Grouping is advisory; the editor must not merge unrelated
+news just because headlines overlap. Publication strings are preserved, not converted
+into ages. The discovery window is a preference; undelivered backlog does not expire.
 
-A global `scan_interval` was considered and rejected: the cron entry already is
-the cadence, and restating it in config creates two sources of truth that drift
-silently. Conditional GET already makes an extra scan cost a 304.
+Only selected IDs are fetched. Each HTTP response is bounded to 3 MB and readable
+text to 12000 characters, with a per-command item budget and inter-request delay.
+Article/main/body text excludes script, navigation, forms and other chrome. Evidence
+is cached; failed refreshes leave the previous successful record intact and return
+an explicit failure. HTTP success and extraction are not semantic verification:
+Hermes must inspect paywall/login/bot pages and cite only supported claims.
 
-What cron genuinely cannot express is per-source politeness, so that is the one
-knob: `min_interval_minutes`, a **floor** on how often a single source may be
-fetched, checked against `last_scan_at`. A source under its floor is reported
-`throttled` and the run carries on — the failure to avoid is one slow blog
-stalling the whole scan, and it is tested.
+## Draft validation and delivery
 
-It reads `last_scan_at` rather than `last_ok_at` so that a failing source is
-backed off too, not retried at full speed.
+Briefing inputs contain highlights, vendor stories and optional community entries.
+Each entry has unique pending IDs, fetched evidence and citations belonging to those
+IDs. Highlights refer to included vendor stories. Category validation keeps community
+threads out of vendor cards. Counts, vendor labels and publication text are supplied
+by Python. The validator checks structure and provenance, not factual entailment.
 
-## 3. No matcher at all
+Drafts enforce single-line highlights (160 characters), story headlines (100),
+summaries (220), and a combined headline/summary budget of 280 characters. Implications
+belong in the same summary rather than a separate paragraph. Overlong text is rejected,
+never silently truncated. Both text and HTML render one bullet per story with inline
+citations; the self-contained HTML adds responsive typography, color and sectioning.
+Older retained drafts remain readable, but their separate implication field is not rendered.
 
-There is nothing to infer about what an item is or who it is for. The human
-answers that by assigning a category to the source, so everything from a source
-in `ai` is AI news.
+Validated drafts are retained in the `briefing` table with a stable ID. Drafting and
+HTML export do not change pending state. The SKILL requires HTML export for each briefing and sends it as a document attachment
+alongside the text message. After both authorized deliveries succeed, Hermes
+acknowledges that ID with `commit`; only included items are marked reported. Repeated
+acknowledgement is idempotent. A stale draft whose items were handled elsewhere is
+refused. Delivery and acknowledgement are separate operations, so exactly-once
+messaging is not guaranteed across a crash between them.
 
-What survives is a single global `exclude` list for feed furniture — sponsored
-posts, newsletter signups — which is a dozen lines inside `scan.py`, not a
-module. There is deliberately **no include list**: an item that a source
-published is in scope by definition.
+Explicit editorial dismissal retains the item and records a review reason. Deferred
+items remain pending. No silent failure path empties the queue or marks drafts sent.
 
-## 4. Identity, and the two different questions it answers
+## Migration and retained interfaces
 
-`item_key = sha1(source | canonical url | folded title)` is identity **within
-one source**. Title and URL together, because either alone is wrong: a hub page
-that links every headline to itself collapses on URL alone, and an outlet
-re-titling a story in place looks new on title alone.
+Existing item, run and source-state rows are preserved. New evidence, review and
+briefing tables are added. Old source names no longer enter the default shortlist;
+`legacy_pending_items` makes that history visible without letting it contaminate the
+new briefing. Feed parsers/scanning remain functional for custom feed configurations.
+The old scan and digest CLI refuse a search configuration, preventing obsolete jobs
+from silently operating with changed semantics. Deployment must replace those jobs
+with one daily Hermes skill invocation; this code does not modify schedules.
 
-Recognising that two *different* sources carry the same story is a separate
-question with a separate answer, and it deliberately happens later, at digest
-time. Conflating them — clustering at scan time and storing the result — would
-mean a rewording on one outlet silently suppressed the story everywhere.
+## Limits
 
-## 5. Clustering
-
-Two items are one story when their canonical URLs match *and they come from
-different sources* (syndication — the same-source case means the page simply has
-no per-item links, and merging on it would collapse the source), or when
-their headlines overlap by at least `cluster_threshold`.
-
-**The overlap coefficient, not Jaccard.** Jaccard divides by the union, so it
-punishes a headline for being long even when it contains the other one whole:
-"OpenAI releases GPT-X" against "OpenAI Releases GPT-X, Its Biggest Model Yet"
-scores 3/6 = 0.5 and splits at any sensible threshold. Dividing by the smaller
-set asks the question that matters — is the shorter headline essentially
-contained in the longer — and scores 3/3. This was found by the test suite, not
-by reasoning, which is the argument for having written those tests first.
-
-Supporting details, each with a reason:
-
-- tokens keep internal hyphens, so `GPT-X` stays one distinctive token rather
-  than becoming `gpt` plus a one-character `x` the length filter discards;
-- a short stopword list only, because every word removed is a word that can no
-  longer distinguish two stories;
-- a headline with fewer than two significant tokens is never clustered — with
-  almost nothing to compare, any two thin headlines look identical;
-- single-link agglomeration in input (id) order, so the grouping is
-  deterministic and a re-run of a digest cannot reshuffle it;
-- the oldest item is the primary, so the outlet that broke the story supplies
-  the title and the link.
-
-Two limits are stated in the README rather than left to be discovered:
-clustering is **within a category** (sections are the reader's taxonomy, and
-merging across would force an arbitrary choice about which section loses the
-story) and **within one digest** (membership depends on what happens to be
-pending together, so storing it would be recording an accident).
-
-## 6. Categories live on the source, not on the item
-
-There is no `category` column. The category is read from the source's *current*
-config when a digest is built, so recategorising a source moves everything of
-its that has not gone out yet — which is what a person expects after the edit. A
-source deleted from the config lands its pending items under `uncategorised`
-rather than dropping them.
-
-A source naming an undeclared category is a load-time error. A typo quietly
-inventing a one-line section at the bottom of the digest is the kind of wrongness
-nobody notices for a month.
-
-## 7. Dates are not parsed
-
-`published_text` is the source's own wording, relayed verbatim. Parsing would
-buy ordering by recency and a "3 hours ago", at the price of occasionally
-stating a confidently wrong time. The whole value of this skill is that its
-facts can be trusted without checking. The cost is real and is listed under
-Limitations: stories appear in first-seen order, not publication order.
-
-## 8. The digest payload
-
-Sections, each with stories — no flat list. The agent writes an intro and relays
-titles, outlet domains and links. It is told explicitly not to summarise an
-article it has only seen the headline of, because that is the one way this skill
-could confidently say something false.
-
-`source_domain` is the domain of the *article* link, not of the feed. For most
-outlets they are the same; for an aggregator they are not, and the article's
-domain is both the more useful label and the thing that lets an aggregator's
-copy cluster with the outlet's own by identical URL.
-
-Commit-then-send, not send-then-commit. A failed send leaves items marked as
-sent, which `items --since` can recover; the other order re-announces the whole
-backlog after a crash, which nothing can undo.
-
-## 9. Telegram
-
-There is no Telegram module: no bot token, no `sendMessage` wrapper, no HTTP
-client for one. `digest.format_digest` returns a ready-to-send body and stops.
-The agent owns the channel, as in every other bundle here.
-
-## Out of scope
-
-- Article-body fetching and per-story summarisation.
-- Cross-digest and cross-category clustering (§5).
-- Parsing dates into structured timestamps (§7).
-- Any model call on the scan path.
-- URL shorteners — links stay the publisher's own.
+Search-provider availability and factual search metadata depend on Hermes's tool.
+No full web crawl, PDF extraction, JavaScript article rendering or semantic fact-checker
+is included. Cached evidence can age; refresh deliberately when an article changes.
+Same-event deduplication across different URLs and different days remains editorial;
+Python guarantees URL identity and supplies clustered pending candidates. No hardcoded
+model, external delivery client, mandatory translation or synthetic community opinion
+is part of the bundle.

@@ -27,7 +27,7 @@ import time as _time
 from datetime import datetime
 
 from . import db, extract, fetch
-from .errors import BrowserError, RadarError
+from .errors import BrowserError, ConfigError, RadarError
 
 
 def _excluded(candidate, keywords) -> str | None:
@@ -82,6 +82,8 @@ def scan(
     fetcher = fetcher or fetch.get
     delay = config.request_delay_seconds
 
+    if any(source.kind == "search" for source in sources):
+        raise ConfigError("search sources use research + ingest, not scan")
     run_id = None if dry_run else db.start_run(conn, now)
     results: list[dict] = []
     failures: list[dict] = []

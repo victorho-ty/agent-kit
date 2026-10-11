@@ -16,7 +16,7 @@ import dataclasses
 import sqlite3
 
 # How a page is turned into candidates.
-SOURCE_KINDS = ("rss", "html", "regex")
+SOURCE_KINDS = ("rss", "html", "regex", "search")
 
 # How a page is retrieved.
 RENDER_MODES = ("static", "browser")

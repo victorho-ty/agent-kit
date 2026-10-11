@@ -5,8 +5,8 @@ on success. A failure prints ``{"ok": false, "error": "ERR_...", ...}`` and exit
 with the code from :class:`news_radar.errors.ExitCode`, so the agent branches on
 a number and a closed enum rather than on a sentence.
 
-Two commands, two schedules. ``scan`` collects and says nothing; ``digest``
-reports. They are wired to separate cron entries on purpose -- see SKILL.md.
+Hermes executes the staged search and writing workflow; Python retains evidence
+and delivery state. Feed scan/digest commands remain for explicit feed configs.
 """
 
 from __future__ import annotations
@@ -14,10 +14,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 
-from . import clock, db, digest as digest_rules, render, scan as scan_run, settings
+from . import briefing, clock, db, digest as digest_rules, evidence, research, render
+from . import scan as scan_run, settings
 from .config import load_config
-from .errors import ExitCode, RadarError
+from .errors import ConfigError, ExitCode, RadarError
 
 
 def _emit(payload: dict) -> None:
@@ -28,9 +30,35 @@ def _emit(payload: dict) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="news-radar",
-        description="Watch configured news sources and digest what is new, by category.",
+        description="Discover AI vendor news, shortlist stories, collect evidence, and prepare a daily briefing.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
+
+    plan = sub.add_parser("research", help="Return vendor search jobs for Hermes; makes no network calls.")
+    plan.add_argument("--topic", help="Return HN/Reddit jobs for a selected story instead.")
+
+    ingest = sub.add_parser("ingest", help="Validate and store actual search results.")
+    ingest.add_argument("--input", required=True, help="JSON file, or - for stdin.")
+
+    shortlist = sub.add_parser("shortlist", help="Compact pending stories from current enabled sources.")
+    shortlist.add_argument("--limit", type=int, default=100)
+
+    article = sub.add_parser("evidence", help="Fetch and cache readable article evidence for selected IDs.")
+    article.add_argument("--id", action="append", type=int, required=True, dest="ids")
+    article.add_argument("--refresh", action="store_true")
+
+    draft = sub.add_parser("briefing", help="Validate and retain a draft, or retrieve a saved briefing.")
+    draft_input = draft.add_mutually_exclusive_group(required=True)
+    draft_input.add_argument("--input", help="Hermes-authored JSON file, or - for stdin.")
+    draft_input.add_argument("--id", type=int, dest="briefing_id")
+    draft.add_argument("--html", type=Path, help="Optional HTML export path; refuses to overwrite.")
+
+    commit = sub.add_parser("commit", help="Acknowledge successful delivery of a saved briefing.")
+    commit.add_argument("--briefing", required=True, type=int, dest="briefing_id")
+
+    dismiss = sub.add_parser("dismiss", help="Retain an editorial rejection and clear it from the queue.")
+    dismiss.add_argument("--id", action="append", type=int, required=True, dest="ids")
+    dismiss.add_argument("--reason", required=True)
 
     scan = sub.add_parser("scan", help="Fetch every enabled source once and store what is new.")
     scan.add_argument("--source", action="append", dest="sources", help="Repeatable. Defaults to all enabled.")
@@ -78,6 +106,15 @@ def _dispatch(args) -> int:
     conn = db.connect()
     now = clock.now(config.tzinfo())
 
+    if args.command in {"research", "ingest", "shortlist", "evidence", "briefing", "commit", "dismiss"}:
+        try:
+            return _cmd_staged(args, config, conn, now)
+        finally:
+            conn.close()
+    if args.command == "digest" and any(s.kind == "search" for s in config.select()):
+        conn.close()
+        raise ConfigError("search workflow: use shortlist, evidence, briefing, then commit after delivery")
+
     if args.command == "scan":
         return _cmd_scan(args, config, conn, now)
     if args.command == "digest":
@@ -102,6 +139,49 @@ def _dispatch(args) -> int:
     return int(ExitCode.OK)
 
 
+def _load_json(path: str) -> dict:
+    try:
+        if path == "-":
+            raw = sys.stdin.read(250_001)
+        else:
+            with open(path, encoding="utf-8") as handle:
+                raw = handle.read(250_001)
+        if len(raw) > 250_000:
+            raise ConfigError("JSON input exceeds 250000 characters")
+        return json.loads(raw)
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ConfigError(f"could not read JSON input: {exc}") from exc
+
+
+def _cmd_staged(args, config, conn, now) -> int:
+    if args.command == "research":
+        result = research.plan(config, now, args.topic)
+    elif args.command == "ingest":
+        result = research.ingest(conn, config, _load_json(args.input), now)
+    elif args.command == "shortlist":
+        result = research.shortlist(conn, config, now, args.limit)
+    elif args.command == "evidence":
+        result = evidence.collect(conn, config, args.ids, now, refresh=args.refresh)
+    elif args.command == "briefing":
+        if args.html is not None and args.html.exists():
+            raise ConfigError("HTML export path already exists; choose a new path")
+        result = (briefing.save(conn, config, _load_json(args.input), now) if args.input
+                  else briefing.read(conn, args.briefing_id))
+        if args.html is not None:
+            try:
+                with args.html.open("x", encoding="utf-8") as handle:
+                    handle.write(briefing.html_document(result["content"]))
+            except OSError as exc:
+                raise ConfigError(f"could not export HTML: {exc}; draft {result['briefing_id']} is retained") from exc
+            result["html_path"] = str(args.html.resolve())
+    elif args.command == "commit":
+        result = briefing.commit(conn, config, args.briefing_id, now)
+    else:
+        result = research.dismiss(conn, config, args.ids, args.reason, now)
+    _emit(result)
+    return int(ExitCode.OK) if result["ok"] else int(ExitCode.ERR_FETCH)
+
+
 def _cmd_scan(args, config, conn, now) -> int:
     sources = config.select(args.sources, args.categories)
     if not sources:
@@ -114,6 +194,8 @@ def _cmd_scan(args, config, conn, now) -> int:
         })
         return int(ExitCode.OK)
 
+    if any(source.kind == "search" for source in sources):
+        raise ConfigError("search workflow: run research, use Hermes web search, then ingest")
     needs_browser = any(source.render == "browser" for source in sources)
     with render.Browser(headless=settings.headless(), timeout=settings.http_timeout()) as browser:
         result = scan_run.scan(
@@ -146,6 +228,7 @@ def _cmd_sources(args, config, conn, now) -> int:
         "now": now.isoformat(),
         "request_delay_seconds": config.request_delay_seconds,
         "detail_budget": config.detail_budget,
+        "lookback_days": config.lookback_days,
         "cluster_threshold": config.cluster_threshold,
         "categories": [category.to_dict() for category in config.categories],
         "exclude": list(config.exclude_keywords),

@@ -201,6 +201,8 @@ def _extract_regex(source, text: str, base_url: str) -> list[Candidate]:
 
 def extract(source, text: str, base_url: str | None = None) -> list[Candidate]:
     """Candidates from one page, capped at the source's ``max_items``."""
+    if source.kind == "search":
+        raise ConfigError("search metadata must be supplied through ingest, not page extraction")
     base_url = base_url or source.url
     if source.kind == "rss":
         return _extract_rss(source, text, base_url)

@@ -26,6 +26,8 @@ import urllib.request
 from . import settings
 from .errors import FetchError
 
+MAX_RESPONSE_BYTES = 3_000_000
+
 USER_AGENT = "news-radar/0.1 (+automated news digest; hourly, conditional GET)"
 
 
@@ -88,7 +90,9 @@ def get(
     for attempt in range(attempts):
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
-                raw = response.read()
+                raw = response.read(MAX_RESPONSE_BYTES + 1)
+                if len(raw) > MAX_RESPONSE_BYTES:
+                    raise FetchError(f"GET {url}: response exceeds {MAX_RESPONSE_BYTES} bytes", url=url)
                 return Response(
                     url=response.geturl(),
                     status=response.status,

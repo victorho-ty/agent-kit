@@ -1,264 +1,109 @@
-# News radar
+# news-radar
 
-An agent skill plus the deterministic Python tools behind it. A scan runs
-continuously over a configured list of news sources and stores what is new; a
-digest, on its own schedule, reports everything published since the last one —
-clustered so a story carried by five outlets reads as one line, and grouped into
-the categories the operator assigned to each source. The agent turns that into
-a message; it never decides what is new.
+A staged AI daily briefing for a Hermes profile. Hermes discovers stories through
+web search, selects the useful developments and writes evidence-supported summaries
+using its configured model. Python plans queries, stores discoveries, deduplicates,
+fetches selected articles, validates drafts and tracks delivery.
 
-```
-news-radar/
-├── news_radar/                         # the package
-│   ├── config/
-│   │   ├── sources.py                  # Source, Category, load_config()
-│   │   └── sources.json                # what is watched, and under which heading
-│   ├── cli.py                          # python -m news_radar <command>
-│   ├── settings.py                     # env overrides: db path, timeouts, pacing
-│   ├── clock.py                        # the one place that reads the wall clock
-│   ├── fetch.py                        # urllib + conditional GET (no HTTP stack)
-│   ├── render.py                       # Chromium, lazily, for "render": "browser"
-│   ├── extract.py                      # page -> candidates (rss / html / regex)
-│   ├── scan.py                         # one run: fetch, extract, remember
-│   ├── cluster.py                      # many items -> one story
-│   ├── digest.py                       # pending items -> sections, per category
-│   └── db.py                           # SQLite: source state, items, run log
-├── skills/news-radar/
-│   ├── SKILL.md                        # what the agent loads
-│   └── references/
-│       ├── cli.md                      # full command surface and JSON shapes
-│       └── source-config.md            # sources, categories, clustering, traps
-├── docs/DESIGN.md                      # why it is shaped this way
-├── tests/                              # pytest, no network, no clock
-└── pyproject.toml
-```
+The default coverage follows the vendor searches in
+[kobyal/ai-latest-briefing](https://github.com/kobyal/ai-latest-briefing/blob/22774b57cb8c8e74e86a702d51072285dd62ab50/ai_latest_briefing/prompts.py):
+Anthropic, AWS Bedrock, OpenAI, Google Gemini and Azure OpenAI. Optional topic-specific
+HN and Reddit searches supply Community Pulse. The GitHub Copilot changelog RSS feed
+is scanned alongside these searches and joins the same LLM selection and evidence-based
+summary pipeline. The upstream application is not
+installed or copied. No ADK, Gemini or JEV dependency is introduced.
 
-Much of the plumbing (`fetch.py`, `render.py`, `extract.py`, `clock.py`, and the
-bones of `db.py`, `scan.py` and `settings.py`) is domain-neutral, and other
-bundles in this repo carry their own copy of it. That duplication is deliberate:
-every bundle here is self-contained — its own venv, its own database,
-installable on its own — so a fix to shared-looking plumbing has to be carried
-across by hand.
+## Setup
 
-## Install on Ubuntu
+Requires Python 3.12+ and uv:
 
 ```bash
-unzip news-radar.zip -d ~/projects/hermes/profile-ai-researcher
-cd ~/projects/hermes/profile-ai-researcher/news-radar
-uv sync
-uv run playwright install --with-deps chromium   # only for "render": "browser" sources
+cd news-radar
+uv sync --group dev
+uv run news-radar research
 ```
 
-Point the agent at the skill — either copy it into the agent's skills directory
-or symlink it:
+Hermes needs an available web-search tool. No Python search-provider key is required.
+Existing installations can keep the `news-radar` console-script symlink pointing to
+this project's `.venv/bin/news-radar`. Install the bundled `skills/news-radar` skill
+in the Hermes profile using the existing deployment process.
 
-```bash
-ln -s ~/projects/hermes/profile-ai-researcher/news-radar/skills/news-radar \
-      ~/.hermes/skills/news-radar
+## Pipeline
+
+```text
+research → feed scan + Hermes web search/ingest → shortlist → Hermes selection
+    → evidence → Hermes writing → briefing → authorized delivery → commit
 ```
 
-And expose the console script so the skill works from any working directory:
-
-```bash
-ln -s ~/projects/hermes/profile-ai-researcher/news-radar/.venv/bin/news-radar \
-      ~/.local/bin/news-radar
-news-radar sources
-```
-
-## Two cron entries, two independent cadences
-
-This is the central design decision, so it goes first.
-
-```bash
-cd ~/projects/hermes/profile-ai-researcher/news-radar && \
-  .venv/bin/news-radar scan                                   # hourly
-cd ~/projects/hermes/profile-ai-researcher/news-radar && \
-  .venv/bin/news-radar digest --commit                        # 08:00, 18:00
-```
-
-`scan` collects and says nothing — no message, no model call, no tokens. It can
-run as often as you like. `digest --commit` is the only thing that produces
-something to send.
-
-They are decoupled through the **database**, not through timing: a digest takes
-every item where `digested_at IS NULL`, however many scans happened since. That
-buys three properties:
-
-- a **missed scan** needs no catch-up — "new" is defined by `item_key` against
-  the table, not by a time range;
-- a **missed digest** loses nothing; the next one is simply longer;
-- **changing either cadence** is a one-line cron edit that cannot desynchronise
-  the other, which is why no interval is restated in the config.
-
-Scanning often matters for a reason beyond freshness: **many feeds only expose
-the last N entries**. If a busy source publishes 15 items between two scans and
-its feed holds 10, five are gone for good — nothing downstream can recover what
-was never seen.
-
-`news-radar digest` without `--commit` is a read-only peek for "anything new
-right now"; it stamps nothing, so it does not consume the next scheduled digest.
-
-## Configuration
-
-| Variable | Default |
+| command | purpose |
 |---|---|
-| `NEWS_RADAR_DB` | `~/.local/share/hermes-ai-researcher/news_radar.db` |
-| `NEWS_RADAR_CONFIG` | `news_radar/config/sources.json` in the bundle |
-| `NEWS_RADAR_TZ` | `Asia/Hong_Kong` (a `timezone` key in the config wins) |
-| `NEWS_RADAR_TIMEOUT` | `20` seconds per request |
-| `NEWS_RADAR_RETRIES` | `2` |
-| `NEWS_RADAR_DELAY` | overrides `request_delay_seconds` from the config |
-| `NEWS_RADAR_HEADLESS` | `1`; set `0` to watch the browser work |
+| `research` | Five vendor search jobs and configured feed scan jobs |
+| `research --topic "story keywords"` | Optional HN/Reddit jobs |
+| `scan --source github-copilot` | Collect new changelog entries into the shared queue |
+| `ingest --input results.json` | Validate/store actual search metadata |
+| `shortlist` | Compact clustered pending stories from enabled sources |
+| `evidence --id ID` | Fetch/cache bounded readable article evidence |
+| `briefing --input draft.json --html NEW_PATH` | Validate, retain and export a Hermes-written briefing |
+| `briefing --id ID --html NEW_PATH` | Retrieve a saved draft and export its attachment for retry |
+| `commit --briefing ID` | Acknowledge successful delivery of that draft |
+| `dismiss --id ID --reason "reason"` | Record editorial rejection without deleting data |
+| `sources`, `items`, `runs` | Inspect configuration, retained items and research health |
 
-State is under `hermes-ai-researcher`, scoped to the profile rather than to this
-bundle, so a second bundle in the same profile needs no second backup rule.
-Moving this bundle to another profile is a one-line change to
-`PROFILE_STATE_DIR` in `settings.py`.
+Repeat `--id` for selected articles. The SKILL requires `--html NEW_PATH` for every
+briefing and delivers the HTML document attachment alongside its text message, including
+on Telegram. The CLI exports a responsive HTML document with a dark header, teal Highlights,
+readable fonts, sectioned story bullets and clickable source links; it refuses to
+overwrite existing files. Text and HTML share the same concise content: up to three
+short Highlights bullets and one line per story, with links inline. Draft validation
+caps highlights at 160 characters and each story's headline plus summary at 280;
+there are no separate why-it-matters paragraphs.
+Use a fresh absolute path with an existing parent directory. Each command prints one
+JSON object. All input/output shapes: [CLI reference](skills/news-radar/references/cli.md).
 
-What is watched lives in `news_radar/config/sources.json`. Whole-line `//`
-comments are stripped before parsing, so the file can carry disabled examples.
+Summaries require fetched article evidence. Search snippets support shortlisting,
+not article summarization. The validator verifies structure, pending IDs and citation
+provenance; Hermes must still verify factual claims against evidence. Missing or
+blocked article content is reported explicitly. A vendor without substantive news
+need not occupy a card. Community research and translation are optional, not forced.
 
-```json
-{
-  "cluster_threshold": 0.7,
-  "categories": [
-    { "name": "ai", "label": "AI" },
-    { "name": "world", "label": "World" }
-  ],
-  "exclude": ["sponsored", "newsletter signup"],
-  "sources": [
-    { "name": "verge-ai", "category": "ai", "kind": "rss",
-      "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
-      "max_items": 30, "enabled": true },
-    { "name": "slow-blog", "category": "ai", "kind": "rss",
-      "url": "https://example.dev/feed",
-      "min_interval_minutes": 360, "enabled": false }
-  ]
-}
-```
+## Daily scheduling and deployment migration
 
-| Field | Meaning |
-|---|---|
-| `categories` | the digest's sections, **in display order** |
-| `category` | **required on every source**; must be one of the declared categories |
-| `exclude` | drops an item outright; the only filter there is |
-| `kind` | `rss` (no selectors, immune to a redesign), `html`, or `regex` |
-| `min_interval_minutes` | a floor on how often *this* source is fetched, not a schedule |
-| `follow_detail` | fetch each new item's own page; leave off for news |
-| `enabled` | `false` pauses a source without losing its history or dedupe memory |
+The shipped skill executes the entire workflow within one daily Hermes job. That
+job must inherit the profile's configured model and use the authorized delivery
+channel. This repository update does not install or modify a live schedule.
 
-There is no include list. You already said what a source is about by giving it a
-category, so everything it publishes is in scope.
+When deploying, replace old hourly `news-radar scan` and `news-radar digest --commit`
+jobs with the staged skill invocation. They deliberately reject the new search
+configuration rather than pretending to collect news or marking unreviewed stories
+as delivered. Feed scanning remains available for explicitly configured legacy feeds.
 
-The five sources shipped in `sources.json` were verified live on 2026-08-11.
-Replace them with your own, and verify each with
-`news-radar scan --source <name> --dry-run` before enabling — full field
-reference in `skills/news-radar/references/source-config.md`.
+A draft does not mark anything reported. Commit only after both the message and HTML
+attachment are delivered. Export or attachment-delivery failures leave the draft and
+pending items available. If only one component succeeds, retry only the missing one. A crash after delivery but before
+acknowledgement can cause a duplicate send; inspect the delivery result before retrying.
 
-## The three rules that make it work
+## Configuration and state
 
-**Cluster.** Two items are one story when their canonical URLs match, or when
-their headlines overlap by at least `cluster_threshold` — shared significant
-words over the *smaller* headline's count. The overlap coefficient rather than
-Jaccard, because Jaccard divides by the union and so punishes a headline for
-being long even when it contains the other whole: "OpenAI releases GPT-X" vs
-"OpenAI Releases GPT-X, Its Biggest Model Yet" scores 0.5 under Jaccard and 1.0
-here. Two limits, both deliberate: clustering happens **within a category** and
-**within one digest**.
+Sources live in `news_radar/config/sources.json`. Add a search topic by configuring
+its category, reference URL and query; Python code and model configuration need no
+change. Query placeholders are `{today}`, `{month_year}` and optional `{topic}`.
+`lookback_days` defaults to 1 and supplies a preferred freshness boundary, not an
+expiry rule. The database, not the time window, prevents repeated articles.
 
-**Dedupe.** An item's identity within a source is
-`sha1(source | canonical url | folded title)`. Title *and* URL, because either
-alone is wrong. Scoped by source on purpose — the same story from two outlets is
-two items, and recognising them as one story is the digest's job. Doing it at
-scan time would mean a rewording on one outlet suppressed the story everywhere.
+[Configuration reference](skills/news-radar/references/source-config.md) describes
+budgets, categories, exclusions, optional feed compatibility and runtime overrides.
 
-**Seed.** A source's first successful scan stores everything already published
-with `digested_at` pre-stamped. Without it, adding a source puts its entire back
-catalogue into the next digest.
+The default database is `~/.local/share/hermes-ai-researcher/news_radar.db`.
+Override with `NEWS_RADAR_DB`; `NEWS_RADAR_CONFIG` selects another source config.
+Existing rows are retained. Evidence, review and briefing tables are created
+additively. Pending records from retired sources are excluded from the new shortlist
+but remain available through `items`. Nothing deletes old news or delivery history.
 
-## Silence has three causes, and they must be distinguishable
-
-- **Not running** — every scan writes a `runs` row, including failures.
-  `news-radar runs` is the liveness check.
-- **A moved feed or a dead selector** — `site_state.recent_yield` remembers what
-  a source returned on its last successful scan, so one that used to yield and
-  now yields nothing is reported `zero_yield`, not silence. A source that has
-  never yielded is treated as quiet, which is why `--dry-run` before enabling
-  is not optional.
-- **Genuinely nothing** — the normal case, and the only one that gets no message.
-
-## Being a good guest
-
-Sources are fetched with a conditional GET: each one's `ETag` and
-`Last-Modified` go back on the next scan, so a feed that publishes twice a day
-answers `304 Not Modified` to the other twenty-two hourly scans. That is what
-makes continuous scanning affordable and polite at the same time. Requests are
-paced by `request_delay_seconds`, `min_interval_minutes` puts a floor under any
-source that deserves one, and a 4xx is never retried — it means the URL is
-wrong, and hammering it will not make it right.
-
-## Data model
-
-SQLite at `$NEWS_RADAR_DB`. Full DDL in `references/cli.md`.
-
-`item` — every candidate ever seen. `digested_at` **is** the ledger, which is
-what lets the two cron entries run on unrelated schedules. `date_text` is stored
-as the source wrote it and never parsed: parsing would let us sort by recency,
-at the price of occasionally announcing a confidently wrong date.
-
-There is no `category` column and no cluster table. Categories are read from the
-source's current config at digest time, so recategorising a source moves
-everything of its that has not gone out yet. Clusters are computed per digest
-and never stored, because membership depends on which items happen to be pending
-together — storing it would be recording an accident.
-
-`site_state` — per source: conditional-GET validators, failure streak, seeded
-flag, last non-zero yield, and `last_scan_at` (which the throttle reads).
-
-`runs` — one row per scan, written even when everything fails. The agent's whole
-triage surface; the skill never parses stdout.
-
-There is no Telegram module anywhere in this package. The agent owns the
-channel. Nothing is ever deleted.
-
-## Tests
+## Validation
 
 ```bash
 uv run pytest -q
 ```
 
-69 tests, no network and no wall clock. `conftest.FakeWeb` serves captured feeds
-and honours conditional GET; every function that needs the time is handed it.
-
-The tests that matter most:
-
-1. **clustering, from both sides** — rewordings of one story must merge, and
-   stories that merely share a subject ("OpenAI releases GPT-X" vs "OpenAI hires
-   a new CFO") must not. Those pull in opposite directions and are the reason
-   the threshold is configurable;
-2. **the ledger decouples the crons** — three scans then one digest returns
-   everything since the last digest, `--commit` is idempotent, and a read
-   without `--commit` consumes nothing;
-3. **the throttle is a floor, not a schedule** — a source inside its interval is
-   skipped while the others in the same run scan normally;
-4. **sections follow the config** — order matches the `categories` list, empty
-   categories are omitted, clustering does not reach across sections, and a
-   deleted source's items surface under `uncategorised` instead of vanishing;
-5. **a first scan reports nothing**, and a feed that goes empty is `zero_yield`
-   rather than silence;
-6. **entities are decoded** — feeds double-escape, and `Zuckerberg&#8217;s`
-   left alone is both mojibake and a broken clustering token.
-
-Fixtures are shaped around specific traps and each says so at the top:
-`alpha.xml` and `beta.xml` carry the same story reworded (and a sponsored post,
-and a double-escaped entity); `beta.xml` also carries a different story sharing
-a subject with it; `gamma.xml` repeats that story in another category to prove
-sections stay apart.
-
-## Limitations
-
-- Clustering is within one digest and within one category (see above).
-- Headlines are compared, not article bodies. Two outlets writing genuinely
-  different headlines for one story will not merge.
-- `date_text` is never parsed, so stories cannot be ordered by publication time
-  — they appear in the order they were first seen.
+Tests run without network calls or API keys and cover search ingestion, evidence,
+citation provenance, delivery acknowledgements and legacy database migration.

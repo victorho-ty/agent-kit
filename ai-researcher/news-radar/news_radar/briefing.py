@@ -192,8 +192,10 @@ footer { padding: 18px 36px; background: #fff; border: 1px solid #dbe3ec; border
 </head>
 <body>
 <main>
-<header><p class="eyebrow">News radar / AI research</p>
-<h1>AI daily briefing</h1><p class="subtitle">Key developments and the sources behind them.</p></header>
+<header>
+<p class="eyebrow">News radar / AI research</p>
+<h1>AI Briefing</h1>
+</header>
 """ + highlights + ('<section aria-labelledby="stories-title"><h2 id="stories-title">Stories</h2>'
                       f'<ul class="entries">{_html_entries(content["stories"])}</ul></section>') + community + """
 <footer>Open a source for the full story.</footer>

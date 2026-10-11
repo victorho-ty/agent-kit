@@ -11,7 +11,7 @@ Agent **profiles**; each bundle inside with deterministic Python package plus th
 
    Data ETL, maths, dedupe, charting, and state tracking.
 
-2. **System One (e.g. JEV) handles fast gating.**
+2. **System One with RLCD (e.g. Jev) to handle fast decisions and gating.**
 
    Bounded classification questions before invoking an expensive LLM.
 

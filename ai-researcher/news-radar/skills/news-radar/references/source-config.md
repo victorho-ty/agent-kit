@@ -1,13 +1,12 @@
 # Search topics and configuration
 
 `news_radar/config/sources.json` supports whole-line `//` comments. The shipped
-configuration replaces the old feeds with five vendor queries adapted from
+configuration replaces the old feeds with vendor queries adapted from
 [kobyal/ai-latest-briefing](https://github.com/kobyal/ai-latest-briefing/blob/22774b57cb8c8e74e86a702d51072285dd62ab50/ai_latest_briefing/prompts.py):
 
 | source | query |
 |---|---|
 | anthropic | Anthropic Claude latest news {month_year} |
-| aws | AWS Bedrock latest announcement {month_year} |
 | openai | OpenAI latest release {month_year} |
 | google | Google Gemini AI latest update {month_year} |
 | azure | Microsoft Azure OpenAI latest announcement {month_year} |
@@ -15,7 +14,7 @@ configuration replaces the old feeds with five vendor queries adapted from
 HN and Reddit jobs use `{topic}` from a selected story and `{today}`. They are
 returned only by `research --topic`. Vendor jobs are returned by plain `research`.
 GitHub Copilot is also enabled as an RSS source at
-`https://github.blog/changelog/label/copilot/feed/` with `max_items: 30`. Plain
+`https://github.blog/changelog/label/copilot/feed/` with `max_items: 15`. Plain
 `research` includes it in `feed_jobs`; Hermes runs its targeted `scan` before the
 shared shortlist. Its new entries go through the same selection and evidence-based
 summarization as search discoveries. The feed does not need a `query` field.

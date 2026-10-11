@@ -61,8 +61,10 @@ Older retained drafts remain readable, but their separate implication field is n
 
 Validated drafts are retained in the `briefing` table with a stable ID. Drafting and
 HTML export do not change pending state. The SKILL requires HTML export for each briefing and sends it as a document attachment
-alongside the text message. After both authorized deliveries succeed, Hermes
-acknowledges that ID with `commit`; only included items are marked reported. Repeated
+with only a one-line Success/Error status in the channel. The text `body` remains
+internal output. Once the authorized HTML upload is confirmed, Hermes acknowledges
+that ID with `commit`; only included items are marked reported. A failed status send
+does not block acknowledgement or require another attachment upload. Repeated
 acknowledgement is idempotent. A stale draft whose items were handled elsewhere is
 refused. Delivery and acknowledgement are separate operations, so exactly-once
 messaging is not guaranteed across a crash between them.

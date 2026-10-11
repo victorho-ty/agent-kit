@@ -1,6 +1,6 @@
 ---
 name: news-radar
-description: Research AI developments from Anthropic, AWS Bedrock, OpenAI, Google Gemini, Azure OpenAI and GitHub Copilot, select important unseen stories, fetch article evidence and deliver a daily briefing with an HTML document attachment. Use for an AI news briefing, an on-demand update, or maintaining its search topics and delivery ledger.
+description: Research AI developments from Anthropic, OpenAI, Google Gemini, Azure OpenAI and GitHub Copilot, select important unseen stories, fetch article evidence and deliver a daily briefing as an HTML document attachment with only a short delivery status in chat. Use for an AI news briefing, an on-demand update, or maintaining its search topics and delivery ledger.
 ---
 
 # News radar
@@ -26,7 +26,7 @@ Do not use `--seed` during normal discovery, because it marks new entries as alr
 reported. Use `--dry-run` only when verifying a source's extraction.
 
 Use your available web-search tool once for each search job's `query`; collect up to
-`max_items` actual results. The five vendor queries follow
+`max_items` actual results. The four vendor queries follow
 ai-latest-briefing's coverage, not a fixed feed list. Prefer substantive announcements,
 primary sources and credible reporting. Do not force a story for every vendor.
 
@@ -93,8 +93,9 @@ analysis and keep unsupported numbers, capabilities and dates out of the briefin
 Always run `news-radar briefing --input draft.json --html NEW_PATH` for a briefing.
 Choose a fresh absolute `.html` file path in the profile's artifact directory and
 create its parent directory before calling the command. The CLI refuses to overwrite
-an existing file. Require a successful result containing both `body` and `html_path`;
-use the exact returned `html_path` for attachment delivery.
+an existing file. Require a successful result containing `briefing_id` and `html_path`;
+use the exact returned `html_path` for attachment delivery. The returned `body` is an
+internal representation; do not send it to the channel.
 
 The command validates references and retains a recoverable draft; it does not stamp
 stories as delivered. Validation checks structure and provenance, not whether the
@@ -103,17 +104,25 @@ the evidence. No Hebrew translation is forced; write in the user's requested lan
 
 ### 6. Deliver and acknowledge
 
-Deliver the validated `body` verbatim, without expanding its bullets, and the HTML file to the same authorized channel
-and conversation. For Telegram, use the available file/document sending capability
-to upload the exact returned `html_path` as a document attachment. A local path in a
-message or Telegram HTML text formatting does not deliver the file. Use one send with
-an attachment when supported, otherwise send the message and document separately.
+Upload the HTML file as a document to the authorized channel and conversation.
+For Telegram, use the available file/document sending capability with the exact
+returned `html_path`. A local path or Telegram HTML text formatting does not deliver
+the file. All briefing content belongs in the attachment: never send `body`, highlights,
+story summaries, source lists or a second text version to the channel. Do not narrate
+the research stages in chat.
 
-Only after both the message and HTML attachment are confirmed delivered, run
-`news-radar commit --briefing BRIEFING_ID`. If export fails, attachment sending is
-unavailable, or either send fails, report the failure and leave the draft uncommitted.
-Do not silently complete delivery with text alone. If one component was delivered,
-retry only the missing component. Keep the exported file available for retries.
+The only channel text is a one-line delivery status. Use
+`Success — AI briefing attached.` as the document caption when supported; otherwise
+send it after confirmed attachment delivery. On failure use
+`Error — SHORT_REASON.` with a brief actionable reason, not the briefing content.
+
+Only after the HTML attachment is confirmed delivered, run
+`news-radar commit --briefing BRIEFING_ID`. Export or attachment-delivery failures
+leave the draft uncommitted; report Error and retry the failed step. Keep the file
+available for retries. If acknowledgement fails after upload, report
+`Error — HTML delivered; acknowledgement failed.` and retry commit, not the upload.
+A status-message failure does not undo confirmed attachment delivery or its commit;
+retry only the status message, without resending the HTML.
 
 To recover a draft and regenerate its attachment, run
 `news-radar briefing --id BRIEFING_ID --html NEW_PATH` with a fresh absolute path.

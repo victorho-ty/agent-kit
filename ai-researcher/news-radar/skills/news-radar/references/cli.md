@@ -8,7 +8,7 @@ Read failures even when `ok` is true. JSON inputs are capped at 250000 character
 
 ## Research and ingestion
 
-`research` returns `as_of`, `window_start`, `lookback_days` and five `jobs`, each with
+`research` returns `as_of`, `window_start`, `lookback_days` and four `jobs`, each with
 `source`, `category`, `query`, `reference_url` and `max_items`. `reference_url` identifies
 the vendor; it is not an article to ingest. `research --topic "keywords"` returns
 community jobs. Commands themselves make no search-provider calls.
@@ -34,7 +34,7 @@ Pass actual search metadata, for example:
         "published_text": null
       }]
     },
-    { "source": "aws", "items": [] },
+    { "source": "google", "items": [] },
     { "source": "openai", "error": "Search tool unavailable for this query" }
   ]
 }
@@ -96,7 +96,8 @@ Output contains `briefing_id`, `created_at`, `committed_at`, `content`, `body` a
 Python-computed `totals`. Vendor labels and publication text are added from the
 ledger. No semantic fact-checking is claimed. An empty `stories` list is refused;
 when nothing merits reporting, do not draft. The text body has Highlights, Stories
-and optional Community Pulse, with one bullet per entry and all its URLs inline. The
+and optional Community Pulse, with one bullet per entry and all its URLs inline.
+`body` is internal output, not a channel message. The
 HTML uses the same concise content in a responsive, styled document: a dark header,
 teal highlights, readable story rows, and clickable source links. It works offline
 without external fonts, scripts or styles. Retained older drafts remain readable;
@@ -108,10 +109,13 @@ retrieves a retained draft and exports its attachment for retry.
 
 ## Delivery state
 
-After confirmed delivery of both the message and HTML document attachment:
-`commit --briefing N`. An export or attachment-delivery failure leaves the draft
-uncommitted; retry only the missing delivery component. Only IDs included in that draft are
-stamped. A repeated acknowledgement returns `already_committed: true` with zero new
+The SKILL sends only the HTML document attachment plus a one-line Success/Error
+status; it never posts `body` or briefing content as chat text. After confirmed HTML
+attachment delivery, run `commit --briefing N`. An export or attachment-delivery
+failure leaves the draft uncommitted; retry the failed step. A commit failure after
+upload requires an acknowledgement retry, not another upload. A status-message
+failure does not prevent committing a delivered attachment; retry only that status.
+Only IDs included in that draft are stamped. A repeated acknowledgement returns `already_committed: true` with zero new
 commits. A draft whose items were reported/dismissed elsewhere is stale and refused.
 
 `dismiss --id N --reason "duplicate coverage"` records an editorial disposition and

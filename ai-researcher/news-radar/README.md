@@ -7,7 +7,7 @@ fetches selected articles, validates drafts and tracks delivery.
 
 The default coverage follows the vendor searches in
 [kobyal/ai-latest-briefing](https://github.com/kobyal/ai-latest-briefing/blob/22774b57cb8c8e74e86a702d51072285dd62ab50/ai_latest_briefing/prompts.py):
-Anthropic, AWS Bedrock, OpenAI, Google Gemini and Azure OpenAI. Optional topic-specific
+Anthropic, OpenAI, Google Gemini and Azure OpenAI. Optional topic-specific
 HN and Reddit searches supply Community Pulse. The GitHub Copilot changelog RSS feed
 is scanned alongside these searches and joins the same LLM selection and evidence-based
 summary pipeline. The upstream application is not
@@ -37,7 +37,7 @@ research → feed scan + Hermes web search/ingest → shortlist → Hermes selec
 
 | command | purpose |
 |---|---|
-| `research` | Five vendor search jobs and configured feed scan jobs |
+| `research` | Four vendor search jobs and configured feed scan jobs |
 | `research --topic "story keywords"` | Optional HN/Reddit jobs |
 | `scan --source github-copilot` | Collect new changelog entries into the shared queue |
 | `ingest --input results.json` | Validate/store actual search metadata |
@@ -50,8 +50,9 @@ research → feed scan + Hermes web search/ingest → shortlist → Hermes selec
 | `sources`, `items`, `runs` | Inspect configuration, retained items and research health |
 
 Repeat `--id` for selected articles. The SKILL requires `--html NEW_PATH` for every
-briefing and delivers the HTML document attachment alongside its text message, including
-on Telegram. The CLI exports a responsive HTML document with a dark header, teal Highlights,
+briefing and delivers it as an HTML document attachment, including on Telegram.
+Channel text is limited to a one-line Success/Error status; the briefing body is not
+posted as a text message. The CLI exports a responsive HTML document with a dark header, teal Highlights,
 readable fonts, sectioned story bullets and clickable source links; it refuses to
 overwrite existing files. Text and HTML share the same concise content: up to three
 short Highlights bullets and one line per story, with links inline. Draft validation
@@ -77,9 +78,11 @@ jobs with the staged skill invocation. They deliberately reject the new search
 configuration rather than pretending to collect news or marking unreviewed stories
 as delivered. Feed scanning remains available for explicitly configured legacy feeds.
 
-A draft does not mark anything reported. Commit only after both the message and HTML
-attachment are delivered. Export or attachment-delivery failures leave the draft and
-pending items available. If only one component succeeds, retry only the missing one. A crash after delivery but before
+A draft does not mark anything reported. Commit only after the HTML attachment is
+confirmed delivered. Export or attachment-delivery failures leave the draft and
+pending items available. Retry acknowledgement if commit fails after upload; retry
+only the status message if that send fails. Never resend a confirmed attachment just
+to recover its acknowledgement or status. A crash after delivery but before
 acknowledgement can cause a duplicate send; inspect the delivery result before retrying.
 
 ## Configuration and state

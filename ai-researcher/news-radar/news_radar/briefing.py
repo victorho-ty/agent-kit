@@ -32,8 +32,8 @@ def validate(conn, config, payload: dict) -> dict:
         raise ConfigError("highlights, stories, and community must be lists")
     if not payload["stories"] or len(payload["stories"]) > config.detail_budget:
         raise ConfigError(f"briefing needs 1 to {config.detail_budget} stories")
-    if len(payload["highlights"]) > 3 or len(payload["community"]) > 3:
-        raise ConfigError("at most 3 highlights and 3 community entries")
+    if len(payload["highlights"]) > 5 or len(payload["community"]) > 3:
+        raise ConfigError("at most 5 highlights and 3 community entries")
     used, used_urls, story_ids, sections = set(), set(), set(), {}
     for section in ("stories", "community"):
         entries = []

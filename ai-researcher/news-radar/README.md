@@ -54,9 +54,10 @@ briefing and delivers it as an HTML document attachment, including on Telegram.
 Channel text is limited to a one-line Success/Error status; the briefing body is not
 posted as a text message. The CLI exports a responsive HTML document with a dark header, teal Highlights,
 readable fonts, sectioned story bullets and clickable source links; it refuses to
-overwrite existing files. Text and HTML share the same concise content: up to three
+overwrite existing files. Text and HTML share the same concise content: up to five
 short Highlights bullets and one line per story, with links inline. Draft validation
-caps highlights at 160 characters and each story's headline plus summary at 280;
+allows up to five Highlights bullets, capped at 160 characters each,
+and caps each story's headline plus summary at 280 characters;
 there are no separate why-it-matters paragraphs.
 Use a fresh absolute path with an existing parent directory. Each command prints one
 JSON object. All input/output shapes: [CLI reference](skills/news-radar/references/cli.md).

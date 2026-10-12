@@ -79,7 +79,7 @@ Write a draft with `highlights`, `stories` and optional `community` entries usin
 [the briefing contract](references/cli.md). Each story needs its fetched evidence IDs,
 a short headline, a one-line factual takeaway and supporting URLs. Include
 only IDs for articles whose evidence was read; do not attach unfetched cluster members.
-Use up to three Highlights bullets tied to included stories: 12–20 words each,
+Use up to five Highlights bullets tied to included stories: 12–20 words each,
 maximum 160 characters. Each story is one logical line (natural wrapping on small
 screens is fine): short headline + key fact, optionally one brief practical implication
 + inline source links. Aim for 25–35 words total; headline and summary together must

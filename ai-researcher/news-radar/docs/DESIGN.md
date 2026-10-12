@@ -52,8 +52,9 @@ IDs. Highlights refer to included vendor stories. Category validation keeps comm
 threads out of vendor cards. Counts, vendor labels and publication text are supplied
 by Python. The validator checks structure and provenance, not factual entailment.
 
-Drafts enforce single-line highlights (160 characters), story headlines (100),
-summaries (220), and a combined headline/summary budget of 280 characters. Implications
+Drafts allow up to five single-line highlights (160 characters each). They enforce
+story headlines (100 characters), summaries (220), and a combined headline/summary
+budget of 280 characters. Implications
 belong in the same summary rather than a separate paragraph. Overlong text is rejected,
 never silently truncated. Both text and HTML render one bullet per story with inline
 citations; the self-contained HTML adds responsive typography, color and sectioning.

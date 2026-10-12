@@ -86,7 +86,7 @@ implication in `summary` only when useful. Highlights are single-line bullets up
 story's headline plus summary at most 280 (excluding source URLs). Community summaries
 are also capped at 220. Multiline text and overlong drafts are rejected for the editor
 to shorten; Python does not truncate claims. Use community-source IDs there, not vendor articles. At most
-three highlights, three community entries and `detail_budget` vendor stories.
+five highlights, three community entries and `detail_budget` vendor stories.
 Each entry needs 1–3 distinct URLs belonging to its own fetched evidence; at least
 one must be a resolved evidence URL. Neither an ID nor a URL can appear in multiple entries.
 Highlights must refer to included vendor stories. All cited IDs must be pending

@@ -42,10 +42,19 @@
       "query": "site:news.ycombinator.com {topic} {today}", "max_items": 5
     },
     {
-      "name": "reddit", "category": "community", "kind": "search",
-      "url": "https://www.reddit.com/r/LocalLLaMA/",
-      "query": "site:reddit.com/r/MachineLearning OR site:reddit.com/r/LocalLLaMA {topic} {today}",
-      "max_items": 5
+      "name": "reddit-githubcopilot", "category": "community", "kind": "search",
+      "url": "https://www.reddit.com/r/GithubCopilot/",
+      "query": "site:reddit.com/r/GithubCopilot {topic} {today}", "max_items": 5
+    },
+    {
+      "name": "reddit-codex", "category": "community", "kind": "search",
+      "url": "https://www.reddit.com/r/codex/",
+      "query": "site:reddit.com/r/codex {topic} {today}", "max_items": 5
+    },
+    {
+      "name": "reddit-claudeai", "category": "community", "kind": "search",
+      "url": "https://www.reddit.com/r/ClaudeAI/",
+      "query": "site:reddit.com/r/ClaudeAI {topic} {today}", "max_items": 5
     }
   ]
 }

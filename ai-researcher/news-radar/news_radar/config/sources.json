@@ -16,6 +16,11 @@
       "name": "github-copilot", "category": "ai", "kind": "rss",
       "url": "https://github.blog/changelog/label/copilot/feed/", "max_items": 15
     },
+    // Section feed advertised by https://www.latent.space/s/ainews
+    {
+      "name": "latent-space-ainews", "category": "ai", "kind": "rss",
+      "url": "https://www.latent.space/feed?sectionId=327741", "max_items": 10
+    },
     {
       "name": "anthropic", "category": "ai", "kind": "search",
       "url": "https://www.anthropic.com/news",
@@ -50,11 +55,6 @@
       "name": "reddit-codex", "category": "community", "kind": "search",
       "url": "https://www.reddit.com/r/codex/",
       "query": "site:reddit.com/r/codex {topic} {today}", "max_items": 5
-    },
-    {
-      "name": "reddit-claudeai", "category": "community", "kind": "search",
-      "url": "https://www.reddit.com/r/ClaudeAI/",
-      "query": "site:reddit.com/r/ClaudeAI {topic} {today}", "max_items": 5
     }
   ]
 }

@@ -49,10 +49,10 @@ research → feed scan + Hermes web search/ingest → shortlist → Hermes selec
 | `dismiss --id ID --reason "reason"` | Record editorial rejection without deleting data |
 | `sources`, `items`, `runs` | Inspect configuration, retained items and research health |
 
-Repeat `--id` for selected articles. The SKILL requires `--html NEW_PATH` for every
+Repeat `--id` for selected articles. The CLI requires `--html NEW_PATH` for every
 briefing and delivers it as an HTML document attachment, including on Telegram.
-Channel text is limited to a one-line Success/Error status; the briefing body is not
-posted as a text message. The CLI exports a responsive HTML document with a dark header, teal Highlights,
+The final channel response is exactly `Success` or `Error`. Briefing CLI output
+contains only metadata and the attachment path, never report content. The CLI exports a responsive HTML document with a dark header, teal Highlights,
 readable fonts, sectioned story bullets and clickable source links; it refuses to
 overwrite existing files. Text and HTML share the same concise content: up to five
 short Highlights bullets and one line per story, with links inline. Draft validation

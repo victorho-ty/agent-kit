@@ -64,7 +64,7 @@ not PDF or JavaScript-rendered content. Inspect login/bot pages and truncation.
 
 ## Briefing input
 
-`briefing --input draft.json` expects exactly these top-level keys:
+`briefing --input draft.json --html NEW_PATH` expects exactly these top-level keys:
 
 ```json
 {
@@ -92,25 +92,28 @@ one must be a resolved evidence URL. Neither an ID nor a URL can appear in multi
 Highlights must refer to included vendor stories. All cited IDs must be pending
 and belong to enabled sources. Every ID needs successful cached article evidence.
 
-Output contains `briefing_id`, `created_at`, `committed_at`, `content`, `body` and
-Python-computed `totals`. Vendor labels and publication text are added from the
-ledger. No semantic fact-checking is claimed. An empty `stories` list is refused;
-when nothing merits reporting, do not draft. The text body has Highlights, Stories
-and optional Community Pulse, with one bullet per entry and all its URLs inline.
-`body` is internal output, not a channel message. The
-HTML uses the same concise content in a responsive, styled document: a dark header,
-teal highlights, readable story rows, and clickable source links. It works offline
-without external fonts, scripts or styles. Retained older drafts remain readable;
-their separate why-it-matters field is no longer rendered. `--html NEW_PATH` exports escaped HTML
-without overwriting another file. The staged SKILL requires `--html` on every briefing
-creation or recovery; choose a fresh absolute path with an existing parent directory.
-Successful export adds `html_path` to the result. `briefing --id N --html NEW_PATH`
-retrieves a retained draft and exports its attachment for retry.
+Output contains only `ok`, `briefing_id`, `created_at`, `committed_at`,
+Python-computed `totals` and absolute `html_path`. The CLI never returns `body`,
+structured `content`, Highlights or summaries for briefing creation or recovery.
+Full content is retained internally for rendering/recovery, not channel text.
+Vendor labels and publication text are added from the ledger. No semantic
+fact-checking is claimed. An empty `stories` list is refused; when nothing merits
+reporting, do not draft.
+
+`--html NEW_PATH` is required by the CLI for every creation or recovery. Choose a
+fresh absolute path with an existing parent directory. HTML uses the concise
+content in a responsive, styled document: a dark header, teal highlights, readable
+story rows and clickable source links. It works offline without external fonts,
+scripts or styles. Retained older drafts remain readable; their separate
+why-it-matters field is no longer rendered. Export refuses to overwrite another
+file. `briefing --id N --html NEW_PATH` re-exports a retained draft for retry.
 
 ## Delivery state
 
-The SKILL sends only the HTML document attachment plus a one-line Success/Error
-status; it never posts `body` or briefing content as chat text. After confirmed HTML
+The SKILL sends the HTML document attachment. The final channel response is
+exactly `Success` or `Error`, with no additional text. A required document caption
+uses only `Success`; otherwise leave it empty. Never forward tool output,
+diagnostics, draft JSON or briefing content as chat text. After confirmed HTML
 attachment delivery, run `commit --briefing N`. An export or attachment-delivery
 failure leaves the draft uncommitted; retry the failed step. A commit failure after
 upload requires an acknowledgement retry, not another upload. A status-message

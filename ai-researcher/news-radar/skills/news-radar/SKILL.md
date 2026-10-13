@@ -13,6 +13,18 @@ Bundle root: `~/projects/hermes/profile-ai-researcher/news-radar`.
 Prefer `news-radar` on PATH. Otherwise run `.venv/bin/python -m news_radar` from
 that root. Each command returns one JSON object. Parse it and use its IDs and URLs.
 
+## Channel response contract
+
+Always deliver the briefing as an HTML document attachment. The final assistant
+response sent to Telegram or another channel must be exactly `Success` after
+confirmed attachment delivery and acknowledgement, or exactly `Error` if a step
+fails. No heading, explanation, summary, Highlights, sources, JSON, file path or
+research narration may appear in channel text. Keep diagnostics in tool results
+for investigation. If a document caption is required, use only `Success`;
+otherwise leave it empty. This contract also applies to scheduled job final replies.
+Never forward tool output to the channel. An empty shortlist produces no report;
+stay quiet on scheduled runs and return only `Success` for an explicit request.
+
 ## Daily workflow
 
 ### 1. Discover
@@ -94,8 +106,8 @@ Always run `news-radar briefing --input draft.json --html NEW_PATH` for a briefi
 Choose a fresh absolute `.html` file path in the profile's artifact directory and
 create its parent directory before calling the command. The CLI refuses to overwrite
 an existing file. Require a successful result containing `briefing_id` and `html_path`;
-use the exact returned `html_path` for attachment delivery. The returned `body` is an
-internal representation; do not send it to the channel.
+use the exact returned `html_path` for attachment delivery. The CLI returns only
+metadata and the attachment path, without `body` or structured briefing `content`.
 
 The command validates references and retains a recoverable draft; it does not stamp
 stories as delivered. Validation checks structure and provenance, not whether the
@@ -111,16 +123,15 @@ the file. All briefing content belongs in the attachment: never send `body`, hig
 story summaries, source lists or a second text version to the channel. Do not narrate
 the research stages in chat.
 
-The only channel text is a one-line delivery status. Use
-`Success — AI briefing attached.` as the document caption when supported; otherwise
-send it after confirmed attachment delivery. On failure use
-`Error — SHORT_REASON.` with a brief actionable reason, not the briefing content.
+The final channel text must be exactly `Success` or `Error`, following the channel
+response contract above. Do not reconstruct a text briefing from draft JSON,
+evidence, tool output or the HTML file.
 
 Only after the HTML attachment is confirmed delivered, run
 `news-radar commit --briefing BRIEFING_ID`. Export or attachment-delivery failures
-leave the draft uncommitted; report Error and retry the failed step. Keep the file
-available for retries. If acknowledgement fails after upload, report
-`Error — HTML delivered; acknowledgement failed.` and retry commit, not the upload.
+leave the draft uncommitted; return only `Error` and retry the failed step. Keep the file
+available for retries. If acknowledgement fails after upload, return only `Error`
+and retry commit, not the upload. Keep the delivery confirmation in internal state.
 A status-message failure does not undo confirmed attachment delivery or its commit;
 retry only the status message, without resending the HTML.
 
@@ -134,7 +145,7 @@ Clear deliberately rejected or redundant pending candidates with
 `news-radar dismiss --id ID --reason "editorial reason"`. Dismissal retains the item
 and an audit record; deferred stories should stay pending. Do not dismiss unrelated
 or unread queue entries just to empty the backlog. An empty shortlist warrants no
-briefing; surface discovery failures separately when they require attention.
+briefing; discovery failures produce only `Error` as channel text.
 
 ## Scheduling and maintenance
 

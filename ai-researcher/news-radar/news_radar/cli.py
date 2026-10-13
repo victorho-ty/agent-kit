@@ -51,7 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
     draft_input = draft.add_mutually_exclusive_group(required=True)
     draft_input.add_argument("--input", help="Hermes-authored JSON file, or - for stdin.")
     draft_input.add_argument("--id", type=int, dest="briefing_id")
-    draft.add_argument("--html", type=Path, help="Optional HTML export path; refuses to overwrite.")
+    draft.add_argument("--html", type=Path, required=True, help="Required HTML export path; refuses to overwrite.")
 
     commit = sub.add_parser("commit", help="Acknowledge successful delivery of a saved briefing.")
     commit.add_argument("--briefing", required=True, type=int, dest="briefing_id")
@@ -163,17 +163,19 @@ def _cmd_staged(args, config, conn, now) -> int:
     elif args.command == "evidence":
         result = evidence.collect(conn, config, args.ids, now, refresh=args.refresh)
     elif args.command == "briefing":
-        if args.html is not None and args.html.exists():
+        if args.html.exists():
             raise ConfigError("HTML export path already exists; choose a new path")
         result = (briefing.save(conn, config, _load_json(args.input), now) if args.input
                   else briefing.read(conn, args.briefing_id))
-        if args.html is not None:
-            try:
-                with args.html.open("x", encoding="utf-8") as handle:
-                    handle.write(briefing.html_document(result["content"]))
-            except OSError as exc:
-                raise ConfigError(f"could not export HTML: {exc}; draft {result['briefing_id']} is retained") from exc
-            result["html_path"] = str(args.html.resolve())
+        try:
+            with args.html.open("x", encoding="utf-8") as handle:
+                handle.write(briefing.html_document(result["content"]))
+        except OSError as exc:
+            raise ConfigError(f"could not export HTML: {exc}; draft {result['briefing_id']} is retained") from exc
+        # Keep report text in the attachment, out of tool output and channel replies.
+        result = {key: result[key] for key in
+                  ("ok", "briefing_id", "created_at", "committed_at", "totals")}
+        result["html_path"] = str(args.html.resolve())
     elif args.command == "commit":
         result = briefing.commit(conn, config, args.briefing_id, now)
     else:

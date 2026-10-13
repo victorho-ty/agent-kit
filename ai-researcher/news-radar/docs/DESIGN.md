@@ -61,9 +61,10 @@ citations; the self-contained HTML adds responsive typography, color and section
 Older retained drafts remain readable, but their separate implication field is not rendered.
 
 Validated drafts are retained in the `briefing` table with a stable ID. Drafting and
-HTML export do not change pending state. The SKILL requires HTML export for each briefing and sends it as a document attachment
-with only a one-line Success/Error status in the channel. The text `body` remains
-internal output. Once the authorized HTML upload is confirmed, Hermes acknowledges
+HTML export do not change pending state. The CLI requires HTML export and returns
+only metadata and the attachment path. Structured content and the text `body` stay
+internal. The SKILL sends the HTML document attachment and returns exactly
+`Success` or `Error` as its final channel response. Once the authorized HTML upload is confirmed, Hermes acknowledges
 that ID with `commit`; only included items are marked reported. A failed status send
 does not block acknowledgement or require another attachment upload. Repeated
 acknowledgement is idempotent. A stale draft whose items were handled elsewhere is

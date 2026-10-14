@@ -92,20 +92,7 @@ def validate(conn, config, payload: dict) -> dict:
 
 
 def render(content: dict) -> str:
-    lines = ["AI daily briefing"]
-    if content["highlights"]:
-        lines.extend(["", "Highlights"])
-        lines.extend(f"• {h['text']}" for h in content["highlights"])
-    lines.extend(["", "Stories"])
-    for story in content["stories"]:
-        links = " · ".join(story["urls"])
-        lines.append(f"• {story['headline']} — {story['summary']} · {links}")
-    if content["community"]:
-        lines.extend(["", "Community Pulse"])
-        for entry in content["community"]:
-            links = " · ".join(entry["urls"])
-            lines.append(f"• {entry['summary']} · {links}")
-    return "\n".join(lines)
+    return "\n".join(f"• {highlight['text']}" for highlight in content["highlights"])
 
 
 def _html_entries(entries: list[dict]) -> str:
@@ -123,7 +110,9 @@ def _html_entries(entries: list[dict]) -> str:
     return "".join(rows)
 
 
-def html_document(content: dict) -> str:
+def html_document(content: dict, generated_at: datetime) -> str:
+    timestamp = (f'<time class="generated-at" datetime="{generated_at.isoformat()}">'
+                 f'{html.escape(generated_at.strftime("%Y-%m-%d %H:%M:%S %Z"))}</time>')
     highlights = ""
     if content["highlights"]:
         bullets = "".join(f'<li>{html.escape(h["text"])}</li>' for h in content["highlights"])
@@ -139,7 +128,7 @@ def html_document(content: dict) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI daily briefing</title>
+<title>AI briefing</title>
 <style>
 :root { color-scheme: light; --ink: #15283e; --muted: #52657b; --teal: #086657; }
 * { box-sizing: border-box; }
@@ -148,7 +137,9 @@ body { margin: 0; background: #edf2f7; color: var(--ink);
 main { max-width: 920px; margin: 40px auto; padding: 0 24px; }
 header { padding: 32px 36px; background: #13283f; color: #fff;
          border-radius: 18px 18px 0 0; border-top: 5px solid #47cfb2; }
-.eyebrow { margin: 0 0 10px; color: #87e5d0; font-size: 12px;
+.header-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-bottom: 10px; }
+.generated-at { margin-left: auto; text-align: right; white-space: nowrap; color: #d0deed; font-size: 12px; }
+.eyebrow { margin: 0; color: #87e5d0; font-size: 12px;
            font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
 h1 { margin: 0; font-size: clamp(28px, 5vw, 40px); line-height: 1.2; letter-spacing: -.03em; }
 .subtitle { margin: 12px 0 0; color: #d0deed; font-size: 15px; }
@@ -193,7 +184,8 @@ footer { padding: 18px 36px; background: #fff; border: 1px solid #dbe3ec; border
 <body>
 <main>
 <header>
-<p class="eyebrow">News radar / AI research</p>
+<div class="header-meta"><p class="eyebrow">News radar</p>
+""" + timestamp + """</div>
 <h1>AI Briefing</h1>
 </header>
 """ + highlights + ('<section aria-labelledby="stories-title"><h2 id="stories-title">Stories</h2>'

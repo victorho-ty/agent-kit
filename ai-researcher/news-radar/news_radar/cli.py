@@ -30,7 +30,7 @@ def _emit(payload: dict) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="news-radar",
-        description="Discover AI vendor news, shortlist stories, collect evidence, and prepare a daily briefing.",
+        description="Discover AI vendor news, shortlist stories, collect evidence, and prepare an AI briefing.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -97,7 +97,7 @@ def run(argv: list[str] | None = None) -> int:
     try:
         return _dispatch(args)
     except RadarError as exc:
-        _emit(exc.payload())
+        _emit({**exc.payload(), "body": exc.message})
         return int(exc.exit_code)
 
 
@@ -169,12 +169,12 @@ def _cmd_staged(args, config, conn, now) -> int:
                   else briefing.read(conn, args.briefing_id))
         try:
             with args.html.open("x", encoding="utf-8") as handle:
-                handle.write(briefing.html_document(result["content"]))
+                handle.write(briefing.html_document(result["content"], now))
         except OSError as exc:
             raise ConfigError(f"could not export HTML: {exc}; draft {result['briefing_id']} is retained") from exc
-        # Keep report text in the attachment, out of tool output and channel replies.
+        # Only Highlights are channel text; detailed stories stay in the attachment.
         result = {key: result[key] for key in
-                  ("ok", "briefing_id", "created_at", "committed_at", "totals")}
+                  ("ok", "briefing_id", "created_at", "committed_at", "totals", "body")}
         result["html_path"] = str(args.html.resolve())
     elif args.command == "commit":
         result = briefing.commit(conn, config, args.briefing_id, now)

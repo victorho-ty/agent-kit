@@ -93,9 +93,11 @@ Highlights must refer to included vendor stories. All cited IDs must be pending
 and belong to enabled sources. Every ID needs successful cached article evidence.
 
 Output contains only `ok`, `briefing_id`, `created_at`, `committed_at`,
-Python-computed `totals` and absolute `html_path`. The CLI never returns `body`,
-structured `content`, Highlights or summaries for briefing creation or recovery.
-Full content is retained internally for rendering/recovery, not channel text.
+Python-computed `totals`, absolute `html_path` and `body`. The `body` is only
+Highlights bullet points, one `• text` line per Highlight, with no heading or
+story/community details. Creation and recovery return the same Highlights body.
+Structured `content` stays internal for HTML rendering/recovery. Failed CLI
+commands return the error message in `body` as well as `message`.
 Vendor labels and publication text are added from the ledger. No semantic
 fact-checking is claimed. An empty `stories` list is refused; when nothing merits
 reporting, do not draft.
@@ -103,21 +105,23 @@ reporting, do not draft.
 `--html NEW_PATH` is required by the CLI for every creation or recovery. Choose a
 fresh absolute path with an existing parent directory. HTML uses the concise
 content in a responsive, styled document: a dark header, teal highlights, readable
-story rows and clickable source links. It works offline without external fonts,
+story rows and clickable source links. The header places the current export
+date/time in the configured timezone to the right of News radar / AI research.
+Recovery uses the current export time, not the original draft creation time. It works offline without external fonts,
 scripts or styles. Retained older drafts remain readable; their separate
 why-it-matters field is no longer rendered. Export refuses to overwrite another
 file. `briefing --id N --html NEW_PATH` re-exports a retained draft for retry.
 
 ## Delivery state
 
-The SKILL sends the HTML document attachment. The final channel response is
-exactly `Success` or `Error`, with no additional text. A required document caption
-uses only `Success`; otherwise leave it empty. Never forward tool output,
-diagnostics, draft JSON or briefing content as chat text. After confirmed HTML
+The SKILL sends the HTML document attachment with an empty caption, then returns
+only the exact Highlights `body` as the final channel response after delivery and
+acknowledgement. Do not add `Success`, headings, metadata or detailed stories.
+On failure, return the actual error message, not a bare `Error`. After confirmed HTML
 attachment delivery, run `commit --briefing N`. An export or attachment-delivery
 failure leaves the draft uncommitted; retry the failed step. A commit failure after
-upload requires an acknowledgement retry, not another upload. A status-message
-failure does not prevent committing a delivered attachment; retry only that status.
+upload requires an acknowledgement retry, not another upload. A Highlights-message
+failure does not prevent committing a delivered attachment; retry only those Highlights.
 Only IDs included in that draft are stamped. A repeated acknowledgement returns `already_committed: true` with zero new
 commits. A draft whose items were reported/dismissed elsewhere is stale and refused.
 
@@ -129,3 +133,9 @@ pending unless explicitly dismissed. Old records are never deleted by this workf
 configuration, retained items, and research ingestion health. Feed `scan` and legacy
 `digest` remain supported for explicit feed configurations, but refuse the new default
 search workflow so old cron commands cannot silently stamp unreviewed discoveries.
+
+## Invocation frequency
+
+The agent framework's cron job controls frequency; this workflow can run on demand
+or any number of times per day. Keep the shared ledger between runs, process unseen
+items, and serialize invocations for the profile. No schedule is installed here.

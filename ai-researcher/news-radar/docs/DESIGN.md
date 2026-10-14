@@ -11,7 +11,7 @@ Python model call, JEV gate, ADK runtime or provider-specific search integration
 The default vendor search queries follow ai-latest-briefing revision 22774b5; the
 implementation is independent. Unlike that application, every vendor need not have
 a story, Hebrew translation is not mandatory, citations cannot be substituted with
-unrelated links, and a fresh daily execution does not discard dedupe history.
+unrelated links, and a fresh execution does not discard dedupe history.
 
 ## Discovery and identity
 
@@ -56,16 +56,19 @@ Drafts allow up to five single-line highlights (160 characters each). They enfor
 story headlines (100 characters), summaries (220), and a combined headline/summary
 budget of 280 characters. Implications
 belong in the same summary rather than a separate paragraph. Overlong text is rejected,
-never silently truncated. Both text and HTML render one bullet per story with inline
-citations; the self-contained HTML adds responsive typography, color and sectioning.
+never silently truncated. The channel body renders only Highlights bullets. HTML renders one bullet per
+story with inline citations; the self-contained HTML adds responsive typography, color and sectioning.
 Older retained drafts remain readable, but their separate implication field is not rendered.
 
 Validated drafts are retained in the `briefing` table with a stable ID. Drafting and
 HTML export do not change pending state. The CLI requires HTML export and returns
-only metadata and the attachment path. Structured content and the text `body` stay
-internal. The SKILL sends the HTML document attachment and returns exactly
-`Success` or `Error` as its final channel response. Once the authorized HTML upload is confirmed, Hermes acknowledges
-that ID with `commit`; only included items are marked reported. A failed status send
+metadata, the attachment path and a Highlights-only `body`. Structured content
+stays internal. The HTML header displays the current export date/time in the
+configured timezone at the far right. Recovery uses its own export time. The SKILL
+sends the HTML document attachment and returns its Highlights body as the final
+channel response; failures return the actual error message. Once the authorized HTML
+upload is confirmed, Hermes acknowledges
+that ID with `commit`; only included items are marked reported. A failed Highlights send
 does not block acknowledgement or require another attachment upload. Repeated
 acknowledgement is idempotent. A stale draft whose items were handled elsewhere is
 refused. Delivery and acknowledgement are separate operations, so exactly-once
@@ -82,7 +85,7 @@ briefing tables are added. Old source names no longer enter the default shortlis
 new briefing. Feed parsers/scanning remain functional for custom feed configurations.
 The old scan and digest CLI refuse a search configuration, preventing obsolete jobs
 from silently operating with changed semantics. Deployment must replace those jobs
-with one daily Hermes skill invocation; this code does not modify schedules.
+with the staged Hermes skill invocation at the framework cron job's chosen frequency; this code does not modify schedules.
 
 ## Limits
 
@@ -93,3 +96,7 @@ Same-event deduplication across different URLs and different days remains editor
 Python guarantees URL identity and supplies clustered pending candidates. No hardcoded
 model, external delivery client, mandatory translation or synthetic community opinion
 is part of the bundle.
+
+The SKILL imposes no daily cadence. It may run on demand or any number of times per
+day, reusing delivery state so earlier reported stories remain excluded. Runs for
+the same profile must be serialized to avoid overlapping delivery decisions.

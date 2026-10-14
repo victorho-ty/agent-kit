@@ -8,3 +8,6 @@
 .venv/
 *.egg-info/
 __pycache__/
+
+# Generated HTML layout verification preview.
+/artifacts/briefing-header-preview.*

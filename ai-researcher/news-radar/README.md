@@ -1,6 +1,6 @@
 # news-radar
 
-A staged AI daily briefing for a Hermes profile. Hermes discovers stories through
+A staged AI briefing for a Hermes profile. Hermes discovers stories through
 web search, selects the useful developments and writes evidence-supported summaries
 using its configured model. Python plans queries, stores discoveries, deduplicates,
 fetches selected articles, validates drafts and tracks delivery.
@@ -51,10 +51,13 @@ research → feed scan + Hermes web search/ingest → shortlist → Hermes selec
 
 Repeat `--id` for selected articles. The CLI requires `--html NEW_PATH` for every
 briefing and delivers it as an HTML document attachment, including on Telegram.
-The final channel response is exactly `Success` or `Error`. Briefing CLI output
-contains only metadata and the attachment path, never report content. The CLI exports a responsive HTML document with a dark header, teal Highlights,
+The final channel response is only the Highlights bullets from CLI `body`; on
+failure, return the actual error message. The HTML attachment remains mandatory.
+CLI output contains metadata, the attachment path and Highlights, without detailed
+stories or Community Pulse. The HTML header shows the current export date/time
+in the configured timezone at the far right. The CLI exports a responsive HTML document with a dark header, teal Highlights,
 readable fonts, sectioned story bullets and clickable source links; it refuses to
-overwrite existing files. Text and HTML share the same concise content: up to five
+overwrite existing files. The HTML contains the concise full report: up to five
 short Highlights bullets and one line per story, with links inline. Draft validation
 allows up to five Highlights bullets, capped at 160 characters each,
 and caps each story's headline plus summary at 280 characters;
@@ -68,11 +71,12 @@ provenance; Hermes must still verify factual claims against evidence. Missing or
 blocked article content is reported explicitly. A vendor without substantive news
 need not occupy a card. Community research and translation are optional, not forced.
 
-## Daily scheduling and deployment migration
+## Scheduling and deployment migration
 
-The shipped skill executes the entire workflow within one daily Hermes job. That
-job must inherit the profile's configured model and use the authorized delivery
-channel. This repository update does not install or modify a live schedule.
+The skill can run on demand or any number of times per day. The agent framework
+cron job decides frequency; the skill imposes no cadence. Each invocation inherits
+the profile's configured model, reuses its ledger and uses the authorized delivery
+channel. Serialize invocations to avoid overlapping deliveries. This repository update does not install or modify a live schedule.
 
 When deploying, replace old hourly `news-radar scan` and `news-radar digest --commit`
 jobs with the staged skill invocation. They deliberately reject the new search
@@ -82,8 +86,8 @@ as delivered. Feed scanning remains available for explicitly configured legacy f
 A draft does not mark anything reported. Commit only after the HTML attachment is
 confirmed delivered. Export or attachment-delivery failures leave the draft and
 pending items available. Retry acknowledgement if commit fails after upload; retry
-only the status message if that send fails. Never resend a confirmed attachment just
-to recover its acknowledgement or status. A crash after delivery but before
+only the Highlights message if that send fails. Never resend a confirmed attachment just
+to recover its acknowledgement or Highlights. A crash after delivery but before
 acknowledgement can cause a duplicate send; inspect the delivery result before retrying.
 
 ## Configuration and state

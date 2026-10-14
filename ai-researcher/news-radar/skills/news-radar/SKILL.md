@@ -1,6 +1,6 @@
 ---
 name: news-radar
-description: Research AI developments from Anthropic, OpenAI, Google Gemini, Azure OpenAI and GitHub Copilot, select important unseen stories, fetch article evidence and deliver a daily briefing as an HTML document attachment with only a short delivery status in chat. Use for an AI news briefing, an on-demand update, or maintaining its search topics and delivery ledger.
+description: Research AI developments from Anthropic, OpenAI, Google Gemini, Azure OpenAI and GitHub Copilot, select important unseen stories, fetch article evidence and deliver an AI briefing as an HTML document attachment with only Highlights bullets in chat. Use for an AI news briefing, an on-demand update, or maintaining its search topics and delivery ledger.
 ---
 
 # News radar
@@ -15,17 +15,19 @@ that root. Each command returns one JSON object. Parse it and use its IDs and UR
 
 ## Channel response contract
 
-Always deliver the briefing as an HTML document attachment. The final assistant
-response sent to Telegram or another channel must be exactly `Success` after
-confirmed attachment delivery and acknowledgement, or exactly `Error` if a step
-fails. No heading, explanation, summary, Highlights, sources, JSON, file path or
-research narration may appear in channel text. Keep diagnostics in tool results
-for investigation. If a document caption is required, use only `Success`;
-otherwise leave it empty. This contract also applies to scheduled job final replies.
-Never forward tool output to the channel. An empty shortlist produces no report;
-stay quiet on scheduled runs and return only `Success` for an explicit request.
+Always deliver each briefing as an HTML document attachment. After confirmed
+attachment delivery and acknowledgement, the final channel response must be the
+exact returned `body`: only Highlights bullet points, without a heading, intro,
+conclusion, status word, story details, source list, JSON or file path. Do not send
+`Success`. Keep the document caption empty and send `body` as the final reply so
+Highlights are not delivered twice. This also applies to scheduled job final replies.
 
-## Daily workflow
+On failure, return the actual error message (`body` or `message` from a failed
+CLI result, or the delivery tool's error), not a bare `Error`. Do not invent an
+error or include briefing content in it. An empty shortlist produces no report;
+stay quiet instead of fabricating Highlights or sending `Success`.
+
+## Briefing workflow
 
 ### 1. Discover
 
@@ -107,7 +109,9 @@ Choose a fresh absolute `.html` file path in the profile's artifact directory an
 create its parent directory before calling the command. The CLI refuses to overwrite
 an existing file. Require a successful result containing `briefing_id` and `html_path`;
 use the exact returned `html_path` for attachment delivery. The CLI returns only
-metadata and the attachment path, without `body` or structured briefing `content`.
+metadata, the attachment path and `body` containing only Highlights bullets.
+Structured briefing `content` is not returned. The HTML header shows the current
+export date/time in the configured timezone at the top right.
 
 The command validates references and retains a recoverable draft; it does not stamp
 stories as delivered. Validation checks structure and provenance, not whether the
@@ -119,21 +123,18 @@ the evidence. No Hebrew translation is forced; write in the user's requested lan
 Upload the HTML file as a document to the authorized channel and conversation.
 For Telegram, use the available file/document sending capability with the exact
 returned `html_path`. A local path or Telegram HTML text formatting does not deliver
-the file. All briefing content belongs in the attachment: never send `body`, highlights,
-story summaries, source lists or a second text version to the channel. Do not narrate
-the research stages in chat.
-
-The final channel text must be exactly `Success` or `Error`, following the channel
-response contract above. Do not reconstruct a text briefing from draft JSON,
-evidence, tool output or the HTML file.
+the file. Detailed stories, Community Pulse and source links belong only in the
+attachment. Do not narrate the research stages in chat. After confirmed delivery
+and acknowledgement, return the exact CLI `body` as the final channel reply;
+never reconstruct a full text briefing from draft JSON, evidence or the HTML.
 
 Only after the HTML attachment is confirmed delivered, run
 `news-radar commit --briefing BRIEFING_ID`. Export or attachment-delivery failures
-leave the draft uncommitted; return only `Error` and retry the failed step. Keep the file
-available for retries. If acknowledgement fails after upload, return only `Error`
+leave the draft uncommitted; return the error message and retry the failed step. Keep the file
+available for retries. If acknowledgement fails after upload, return its error message
 and retry commit, not the upload. Keep the delivery confirmation in internal state.
-A status-message failure does not undo confirmed attachment delivery or its commit;
-retry only the status message, without resending the HTML.
+A Highlights-message failure does not undo confirmed attachment delivery or its commit;
+retry only the Highlights message, without resending the HTML.
 
 To recover a draft and regenerate its attachment, run
 `news-radar briefing --id BRIEFING_ID --html NEW_PATH` with a fresh absolute path.
@@ -145,12 +146,15 @@ Clear deliberately rejected or redundant pending candidates with
 `news-radar dismiss --id ID --reason "editorial reason"`. Dismissal retains the item
 and an audit record; deferred stories should stay pending. Do not dismiss unrelated
 or unread queue entries just to empty the backlog. An empty shortlist warrants no
-briefing; discovery failures produce only `Error` as channel text.
+briefing; discovery failures produce their actual error message as channel text.
 
 ## Scheduling and maintenance
 
-Use one daily Hermes job that invokes this complete workflow and inherits the
-profile's current model. Keep discovery and drafting within that job; Python does
+Run this complete workflow on demand or whenever the agent framework's cron job
+invokes it. It can run any number of times per day; the framework controls frequency.
+Inherit the profile's current model and reuse the same ledger across invocations.
+Serialize runs for this profile to avoid duplicate delivery of overlapping drafts.
+Keep discovery and drafting within the invocation; Python does
 not perform web search or model calls on its own. Configure a time and delivery
 channel only when requested. Existing hourly `scan` and `digest --commit` jobs must
 be replaced when deploying this search workflow; those commands refuse the shipped

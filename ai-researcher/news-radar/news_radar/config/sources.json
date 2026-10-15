@@ -37,9 +37,9 @@
       "query": "Google Gemini AI latest update {month_year}", "max_items": 10
     },
     {
-      "name": "azure", "category": "ai", "kind": "search",
-      "url": "https://azure.microsoft.com/en-us/blog/",
-      "query": "Microsoft Azure OpenAI latest announcement {month_year}", "max_items": 10
+      "name": "technode", "category": "ai", "kind": "rss",
+      "url": "https://technode.com/feed/", "max_items": 15,
+      "max_response_bytes": 15000000
     },
     {
       "name": "hacker-news", "category": "community", "kind": "search",

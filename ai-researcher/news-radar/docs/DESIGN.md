@@ -100,3 +100,14 @@ is part of the bundle.
 The SKILL imposes no daily cadence. It may run on demand or any number of times per
 day, reusing delivery state so earlier reported stories remain excluded. Runs for
 the same profile must be serialized to avoid overlapping delivery decisions.
+
+## Invocation files
+
+`run-dir` creates a timestamp-only `YYYYMMDDTHHMMSS` directory below the profile's
+artifact runs directory using the configured timezone. Exclusive directory
+creation prevents reuse even if two invocations start in the same second; the
+loser receives an error and can retry later. Returned absolute paths isolate search
+metadata, drafts and HTML between runs. Community batches use distinct numbered
+files in that run directory. Recovery creates a new run directory; files and the
+shared delivery ledger are preserved. Directory isolation does not serialize
+selection or delivery, so profile invocations must still not overlap.

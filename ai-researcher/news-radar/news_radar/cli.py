@@ -34,6 +34,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
+    run_dir = sub.add_parser("run-dir", help="Create a fresh timestamped directory for this invocation.")
+    run_dir.add_argument("--root", required=True, type=Path, help="Profile artifact runs directory.")
+
     plan = sub.add_parser("research", help="Return vendor search jobs for Hermes; makes no network calls.")
     plan.add_argument("--topic", help="Return HN/Reddit jobs for a selected story instead.")
 
@@ -103,8 +106,10 @@ def run(argv: list[str] | None = None) -> int:
 
 def _dispatch(args) -> int:
     config = load_config()
-    conn = db.connect()
     now = clock.now(config.tzinfo())
+    if args.command == "run-dir":
+        return _cmd_run_dir(args, now)
+    conn = db.connect()
 
     if args.command in {"research", "ingest", "shortlist", "evidence", "briefing", "commit", "dismiss"}:
         try:
@@ -136,6 +141,23 @@ def _dispatch(args) -> int:
     if args.command == "runs":
         _emit({"ok": True, "runs": db.recent_runs(conn, args.limit), **db.pending_count(conn)})
         return int(ExitCode.OK)
+    return int(ExitCode.OK)
+
+
+def _cmd_run_dir(args, now) -> int:
+    root = args.root.expanduser().resolve()
+    run_dir = root / now.strftime("%Y%m%dT%H%M%S")
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        run_dir.mkdir()
+    except FileExistsError as exc:
+        raise ConfigError(f"run directory already exists: {run_dir}; retry in a later second, never reuse it") from exc
+    except OSError as exc:
+        raise ConfigError(f"could not create run directory: {exc}") from exc
+    _emit({"ok": True, "run_dir": str(run_dir),
+           "results_path": str(run_dir / "results.json"),
+           "draft_path": str(run_dir / "draft.json"),
+           "html_path": str(run_dir / "briefing.html")})
     return int(ExitCode.OK)
 
 

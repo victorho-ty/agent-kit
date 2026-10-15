@@ -70,6 +70,7 @@ def get(
     last_modified: str | None = None,
     timeout: float | None = None,
     retries: int | None = None,
+    max_response_bytes: int = MAX_RESPONSE_BYTES,
 ) -> Response:
     """GET ``url``, returning a 304 ``Response`` when it is unchanged."""
     timeout = settings.http_timeout() if timeout is None else timeout
@@ -90,9 +91,9 @@ def get(
     for attempt in range(attempts):
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
-                raw = response.read(MAX_RESPONSE_BYTES + 1)
-                if len(raw) > MAX_RESPONSE_BYTES:
-                    raise FetchError(f"GET {url}: response exceeds {MAX_RESPONSE_BYTES} bytes", url=url)
+                raw = response.read(max_response_bytes + 1)
+                if len(raw) > max_response_bytes:
+                    raise FetchError(f"GET {url}: response exceeds {max_response_bytes} bytes", url=url)
                 return Response(
                     url=response.geturl(),
                     status=response.status,

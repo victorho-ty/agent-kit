@@ -9,7 +9,6 @@ configuration replaces the old feeds with vendor queries adapted from
 | anthropic | Anthropic Claude latest news {month_year} |
 | openai | OpenAI latest release {month_year} |
 | google | Google Gemini AI latest update {month_year} |
-| azure | Microsoft Azure OpenAI latest announcement {month_year} |
 
 HN and Reddit jobs use `{topic}` from a selected story and `{today}`. They are
 returned only by `research --topic`. Vendor jobs are returned by plain `research`.
@@ -68,3 +67,14 @@ use `scan --source NAME --dry-run` to verify an explicit feed configuration.
 Environment overrides remain `NEWS_RADAR_CONFIG`, `NEWS_RADAR_DB`, `NEWS_RADAR_TZ`,
 `NEWS_RADAR_TIMEOUT`, `NEWS_RADAR_RETRIES`, `NEWS_RADAR_DELAY` (legacy feed pacing),
 and `NEWS_RADAR_HEADLESS` (legacy browser feeds).
+
+## TechNode
+
+`technode` uses category `ai` and kind `rss` at https://technode.com/feed/.
+It is a broad technology feed: the model must reject non-AI stories at selection.
+At verification on 2026-10-15 it returned about 2000 entries (11.8 MB), so its source
+sets `max_response_bytes: 15000000`. This optional static-feed listing override
+accepts integers from 1 to 20000000; the default stays 3 MB. It applies only to
+the source listing request. Article evidence and detail fetches retain the default
+3 MB cap. `max_items: 15` bounds candidates after parsing; it does not limit the
+publisher's response. Conditional GET remains enabled. No parser change is needed.

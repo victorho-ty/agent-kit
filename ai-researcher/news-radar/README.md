@@ -7,7 +7,9 @@ fetches selected articles, validates drafts and tracks delivery.
 
 The default coverage follows the vendor searches in
 [kobyal/ai-latest-briefing](https://github.com/kobyal/ai-latest-briefing/blob/22774b57cb8c8e74e86a702d51072285dd62ab50/ai_latest_briefing/prompts.py):
-Anthropic, OpenAI, Google Gemini and Azure OpenAI. Optional topic-specific
+Anthropic, OpenAI and Google Gemini, plus configured RSS sources including
+GitHub Copilot, Latent Space AI News and TechNode. TechNode covers technology
+broadly; only relevant AI stories enter the briefing. Optional topic-specific
 HN and Reddit searches supply Community Pulse. The GitHub Copilot changelog RSS feed
 is scanned alongside these searches and joins the same LLM selection and evidence-based
 summary pipeline. The upstream application is not
@@ -37,7 +39,8 @@ research → feed scan + Hermes web search/ingest → shortlist → Hermes selec
 
 | command | purpose |
 |---|---|
-| `research` | Four vendor search jobs and configured feed scan jobs |
+| `run-dir --root /ABS/PROFILE/artifacts/runs` | Create a fresh timestamped run directory and return absolute file paths |
+| `research` | Configured vendor search jobs and feed scan jobs |
 | `research --topic "story keywords"` | Optional HN/Reddit jobs |
 | `scan --source github-copilot` | Collect new changelog entries into the shared queue |
 | `ingest --input results.json` | Validate/store actual search metadata |
@@ -48,6 +51,11 @@ research → feed scan + Hermes web search/ingest → shortlist → Hermes selec
 | `commit --briefing ID` | Acknowledge successful delivery of that draft |
 | `dismiss --id ID --reason "reason"` | Record editorial rejection without deleting data |
 | `sources`, `items`, `runs` | Inspect configuration, retained items and research health |
+
+Start each invocation with `run-dir`. It creates a short directory such as
+`artifacts/runs/20261015T143025/`, holding `results.json`, `draft.json` and
+`briefing.html`. Use the returned absolute paths in subsequent commands. A
+same-second collision returns an error; retry later rather than reusing files.
 
 Repeat `--id` for selected articles. The CLI requires `--html NEW_PATH` for every
 briefing and delivers it as an HTML document attachment, including on Telegram.

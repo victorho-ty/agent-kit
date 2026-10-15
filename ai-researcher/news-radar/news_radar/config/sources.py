@@ -76,6 +76,7 @@ class Source:
     detail_selector: str | None = None
     min_interval_minutes: int = 0
     max_items: int = DEFAULT_MAX_ITEMS
+    max_response_bytes: int | None = None
     enabled: bool = True
 
     def __post_init__(self):
@@ -111,6 +112,11 @@ class Source:
                 raise ConfigError(f"source {self.name!r}: fields must include 'title'")
         if self.kind == "regex" and not self.item_pattern:
             raise ConfigError(f"source {self.name!r}: kind 'regex' needs an item_pattern")
+        if self.max_response_bytes is not None:
+            if type(self.max_response_bytes) is not int or not 1 <= self.max_response_bytes <= 20_000_000:
+                raise ConfigError(f"source {self.name!r}: max_response_bytes must be an integer from 1 to 20000000")
+            if self.kind == "search" or self.render != "static":
+                raise ConfigError(f"source {self.name!r}: max_response_bytes needs a static feed source")
         if self.max_items < 1:
             raise ConfigError(f"source {self.name!r}: max_items must be >= 1")
         if self.min_interval_minutes < 0:
@@ -127,6 +133,7 @@ class Source:
             "follow_detail": self.follow_detail,
             "min_interval_minutes": self.min_interval_minutes,
             "max_items": self.max_items,
+            "max_response_bytes": self.max_response_bytes,
             "enabled": self.enabled,
         }
 

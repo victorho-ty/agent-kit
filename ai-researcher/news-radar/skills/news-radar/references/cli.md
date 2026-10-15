@@ -6,9 +6,25 @@ failed collection exits 20. Invalid input exits 10. Unknown items/drafts exit 30
 Read failures even when `ok` is true. JSON inputs are capped at 250000 characters.
 `--input -` reads stdin. Do not put API keys in these files.
 
+## Run files
+
+Start each invocation with `run-dir --root /ABS/PROFILE/artifacts/runs`. It creates
+`YYYYMMDDTHHMMSS` using the configured timezone, e.g. `20261015T143025`, and returns
+`ok`, absolute `run_dir`, `results_path`, `draft_path` and `html_path`. The filenames
+are `results.json`, `draft.json` and `briefing.html` within that new directory.
+No database is opened or changed by this command. Directory creation is atomic:
+if another invocation already created that timestamp, it returns an error; retry
+in a later second without reusing the directory or adding a suffix.
+
+Use those absolute paths in `ingest --input RESULTS_PATH` and
+`briefing --input DRAFT_PATH --html HTML_PATH`. Additional community batches use
+fresh `community-1.json`, `community-2.json`, etc. under the same `run_dir`.
+Keep files for retries. Recovery exports use a new run directory and its returned
+HTML path. Unique files do not replace the requirement to serialize profile runs.
+
 ## Research and ingestion
 
-`research` returns `as_of`, `window_start`, `lookback_days` and four `jobs`, each with
+`research` returns `as_of`, `window_start`, `lookback_days` and configured search `jobs`, each with
 `source`, `category`, `query`, `reference_url` and `max_items`. `reference_url` identifies
 the vendor; it is not an article to ingest. `research --topic "keywords"` returns
 community jobs. Commands themselves make no search-provider calls.

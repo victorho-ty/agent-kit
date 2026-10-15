@@ -112,7 +112,9 @@ def scan(
                 if browser is None:
                     raise BrowserError(f"source {source.name!r} needs a browser but none was started")
                 return browser.get(url)
-            return fetcher(url, etag=etag, last_modified=last_modified)
+            limits = ({"max_response_bytes": source.max_response_bytes}
+                      if url == source.url and source.max_response_bytes is not None else {})
+            return fetcher(url, etag=etag, last_modified=last_modified, **limits)
 
         try:
             if not first_request:

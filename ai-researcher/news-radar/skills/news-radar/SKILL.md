@@ -1,6 +1,6 @@
 ---
 name: news-radar
-description: Research AI developments from Anthropic, OpenAI, Google Gemini, Azure OpenAI and GitHub Copilot, select important unseen stories, fetch article evidence and deliver an AI briefing as an HTML document attachment with only Highlights bullets in chat. Use for an AI news briefing, an on-demand update, or maintaining its search topics and delivery ledger.
+description: Research AI developments from Anthropic, OpenAI, Google Gemini, GitHub Copilot, Latent Space and TechNode, select important unseen stories, fetch article evidence and deliver an AI briefing as an HTML document attachment with only Highlights bullets in chat. Use for an AI news briefing, an on-demand update, or maintaining its search topics and delivery ledger.
 ---
 
 # News radar
@@ -29,27 +29,33 @@ stay quiet instead of fabricating Highlights or sending `Success`.
 
 ## Briefing workflow
 
+Before discovery, run `news-radar run-dir --root /ABS/PROFILE/artifacts/runs` using
+this profile's actual artifact directory. Python creates a fresh directory named
+`YYYYMMDDTHHMMSS` (for example `20261015T143025`) in the configured timezone.
+Keep its returned absolute `run_dir`, `results_path`, `draft_path` and `html_path`
+for the whole invocation. If the timestamp already exists, retry in a later second;
+never reuse it or add a suffix. Do not write invocation files into the bundle root.
+
 ### 1. Discover
 
 Run `news-radar research`. For every returned `feed_jobs` entry, run
 `news-radar scan --source SOURCE` using its exact source name. The configured Copilot
-RSS feed is collected this way; do not pass feed entries through search ingestion.
+RSS feed and other configured feeds are collected this way; do not pass feed entries through search ingestion.
 Check scan status and failures. The first successful scan absorbs an existing feed's
 back catalogue silently; entries appearing afterwards enter the pending shortlist.
 Do not use `--seed` during normal discovery, because it marks new entries as already
 reported. Use `--dry-run` only when verifying a source's extraction.
 
 Use your available web-search tool once for each search job's `query`; collect up to
-`max_items` actual results. The four vendor queries follow
-ai-latest-briefing's coverage, not a fixed feed list. Prefer substantive announcements,
+`max_items` actual results. Execute the configured queries as returned. Prefer substantive announcements,
 primary sources and credible reporting. Do not force a story for every vendor.
 
 The returned `window_start` is the preferred freshness boundary. Preserve publication
 text exactly; do not invent dates or compute ages. Older unseen developments may be
 included when useful; mention the source date in their one-line summary if age matters. A quiet vendor needs no filler.
 
-Write the returned search metadata to a JSON file and run
-`news-radar ingest --input results.json`. Copy titles, article/thread URLs, snippets
+Write search metadata to the returned `results_path` and run
+`news-radar ingest --input RESULTS_PATH` with that exact absolute path. Copy titles, article/thread URLs, snippets
 and publication text from search results, not your interpretations. Record a failed
 search as `error`, and an honestly empty search as `items: []`. Do not turn failures
 into "no news". See [the input contract](references/cli.md) when constructing files.
@@ -64,6 +70,8 @@ selection, article-evidence retrieval, summarization and HTML attachment deliver
 vendor search discoveries; an RSS description is only a shortlisting snippet. Prioritize material capabilities, releases, research, pricing, availability
 and practical developer consequences. Avoid repetitive coverage and generic opinion.
 Select a manageable briefing; fewer strong stories are better than padding it.
+TechNode is a general technology RSS feed: include only material AI-related stories.
+Its `ai` category is an editorial destination, not a claim that every entry covers AI.
 No first-pass classifier or additional agent is required.
 
 `has_more` means the queue was capped, not that there are no other stories. Inspect
@@ -82,7 +90,9 @@ the story. Do not write article summaries from search snippets alone.
 ### 4. Optional community research
 
 For a significant selected story, run `news-radar research --topic "story keywords"`.
-Execute the HN/Reddit jobs, ingest actual thread results, and fetch their evidence.
+Execute the HN/Reddit jobs, write each batch to a fresh `community-1.json`,
+`community-2.json`, etc. inside this invocation's `run_dir`, ingest using its
+absolute path, and fetch thread evidence.
 Include Community Pulse only when the retrieved discussion supports the reported
 viewpoints. Distinguish individual reactions from broad consensus. Omit unavailable
 or thin discussion; do not invent quotes.
@@ -104,10 +114,9 @@ Multiple supporting URLs stay inline in the same entry; never repeat a URL in an
 entry. The reader can open the source for details. Interpret implications clearly as
 analysis and keep unsupported numbers, capabilities and dates out of the briefing.
 
-Always run `news-radar briefing --input draft.json --html NEW_PATH` for a briefing.
-Choose a fresh absolute `.html` file path in the profile's artifact directory and
-create its parent directory before calling the command. The CLI refuses to overwrite
-an existing file. Require a successful result containing `briefing_id` and `html_path`;
+Write the draft to the returned `draft_path`, then run
+`news-radar briefing --input DRAFT_PATH --html HTML_PATH` with the exact returned
+absolute paths. The CLI refuses to overwrite an existing HTML file. Require a successful result containing `briefing_id` and `html_path`;
 use the exact returned `html_path` for attachment delivery. The CLI returns only
 metadata, the attachment path and `body` containing only Highlights bullets.
 Structured briefing `content` is not returned. The HTML header shows the current
@@ -137,7 +146,9 @@ A Highlights-message failure does not undo confirmed attachment delivery or its 
 retry only the Highlights message, without resending the HTML.
 
 To recover a draft and regenerate its attachment, run
-`news-radar briefing --id BRIEFING_ID --html NEW_PATH` with a fresh absolute path.
+`news-radar run-dir --root /ABS/PROFILE/artifacts/runs` to create a fresh recovery
+directory, then `news-radar briefing --id BRIEFING_ID --html HTML_PATH` using its
+returned absolute `html_path`. Retain the original run directory for investigation.
 Never commit merely because a draft or file was generated. Delivery and acknowledgement
 are separate operations, so a crash between them can duplicate a send; inspect the
 delivery results before retrying.

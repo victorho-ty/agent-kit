@@ -45,6 +45,9 @@ def test_duplicate_names_are_refused(tmp_path):
     ({"kind": "telepathy"}, "kind"),
     ({"render": "interpretive-dance"}, "render"),
     ({"max_items": 0}, "max_items"),
+    ({"max_response_bytes": 0}, "max_response_bytes"),
+    ({"max_response_bytes": True}, "max_response_bytes"),
+    ({"max_response_bytes": 20_000_001}, "max_response_bytes"),
     ({"min_interval_minutes": -5}, "min_interval_minutes"),
     ({"kind": "html"}, "list_selector"),
 ])

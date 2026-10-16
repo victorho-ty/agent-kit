@@ -112,8 +112,10 @@ A transaction is reported when it satisfies **both** dimensions:
 | *omitted* | `[[500, 700]]` | every flat of 500–700 feet, any layout |
 | *omitted* | *omitted* | **every transaction in the estate** |
 
-Everything else in the estate is still fetched and stored — it feeds the
-estate-wide trend — but is never announced.
+Everything else in the estate is still fetched and stored, so later criteria
+changes can use the archived history, but is never announced. Trends and charts
+recheck the current criteria and require every configured dimension to be known
+and pass. Notification matching below is more permissive about missing data.
 
 ### What an unpublished dimension does
 

@@ -59,7 +59,7 @@ def test_a_repeat_check_adds_nothing(config, conn, serve):
 
 
 def test_unmatched_transactions_are_still_stored_for_the_trend(config, conn, serve):
-    """The trend is estate-wide, so the archive cannot hold only the matches."""
+    """Keep unmatched history so future criteria changes can qualify it."""
     check_module.check(config, conn=conn)
     total = conn.execute("SELECT COUNT(*) FROM transaction_row").fetchone()[0]
     matched = conn.execute("SELECT COUNT(*) FROM transaction_row WHERE matched = 1").fetchone()[0]

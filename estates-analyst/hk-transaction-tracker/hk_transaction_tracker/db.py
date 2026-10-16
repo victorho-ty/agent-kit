@@ -16,11 +16,9 @@ Three tables, three jobs:
 * **runs** -- one row per check including the failures, which is the agent's
   whole triage surface. It never parses stdout to find out what happened.
 
-**Unmatched transactions are stored too, and that is the point.** The trend and
-the charts are estate-wide -- every residential unit in the block, not only the
-two-bedroom flats somebody asked to be told about -- because a median over the
-handful of transactions matching a narrow filter is noise, not a market level.
-Storing only the matches would make the trend unrecoverable after the fact.
+**Unmatched transactions are stored too.** Trends and charts recheck the
+current bedroom and size criteria against the archive. Keeping every residential
+transaction lets revised criteria apply to history without another fetch.
 
 Nothing here ever deletes a transaction row, and nothing rewrites one except the
 exclusion flag. The newest hundred records are all Centanet will serve and there

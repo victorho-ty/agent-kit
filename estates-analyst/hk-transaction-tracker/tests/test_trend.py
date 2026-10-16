@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+import pytest
+
 from hk_transaction_tracker import db, trend
 from hk_transaction_tracker.match import MatchResult
 
@@ -129,3 +131,110 @@ def test_months_without_a_transaction_are_omitted_not_zeroed(conn):
     add(conn, date(2026, 8, 1), 23_000)
     series = trend.monthly_series(conn, "泓都", "sale", TODAY)
     assert [point["month"] for point in series["points"]] == ["2026-06", "2026-08"]
+
+
+@pytest.mark.parametrize("calculation", ["monthly", "window"])
+@pytest.mark.parametrize("deal_type,unit_price", [("sale", 20_000), ("rental", 50)])
+def test_statistics_use_current_criteria_not_stored_match(
+    conn, config_factory, deal_type, unit_price, calculation,
+):
+    entry = config_factory().entry("泓都")
+    cases = [
+        ("low-boundary", 2, 500, False, unit_price),
+        ("high-boundary", 3, 700, False, unit_price + 10),
+        ("wrong-bedroom", 1, 600, True, unit_price * 10),
+        ("too-small", 2, 499, True, unit_price * 10),
+        ("too-large", 3, 701, True, unit_price * 10),
+        ("unknown-bedroom", None, 600, True, unit_price * 10),
+        ("unknown-area", 2, None, True, unit_price * 10),
+        ("excluded", 2, 600, True, unit_price * 10),
+    ]
+    for tx_id, bedrooms, area, matched, price in cases:
+        db.insert_transaction(
+            conn,
+            make_transaction(
+                tx_id=tx_id, deal_type=deal_type, ins_date=date(2026, 6, 1),
+                bedrooms=bedrooms, saleable_area=area, saleable_unit_price=price,
+            ),
+            MatchResult(matched=matched, reason="old criteria"), NOW,
+        )
+    db.set_excluded(conn, "excluded", NOW, reason="not a market price")
+    # Neither another estate nor the other side of the market can enter a point.
+    add(conn, date(2026, 6, 1), unit_price * 10, estate="other", deal_type=deal_type)
+    other_side = "rental" if deal_type == "sale" else "sale"
+    add(conn, date(2026, 6, 1), unit_price * 10, deal_type=other_side)
+
+    if calculation == "monthly":
+        series = trend.monthly_series(conn, "泓都", deal_type, TODAY, entry=entry)
+        assert series["points"] == [
+            {"month": "2026-06", "median_unit_price": unit_price + 5, "samples": 2},
+        ]
+    else:
+        series = trend.bucket_trend(conn, "泓都", deal_type, TODAY, entry=entry)
+        assert series["recent"]["median_unit_price"] == unit_price + 5
+        assert series["recent"]["samples"] == 2
+        assert series["archive"]["transactions"] == 2
+    assert series["scope_label"] == "符合設定條件：2房、3房；500-700呎"
+    assert series["criteria"]["bedrooms"] == [2, 3]
+    archived = {row["tx_id"]: row for row in db.query(
+        conn, estate="泓都", deal_type=deal_type, include_excluded=True,
+    )}
+    assert len(archived) == len(cases)
+    assert archived["low-boundary"]["matched"] == 0
+    assert archived["wrong-bedroom"]["matched"] == 1
+
+
+@pytest.mark.parametrize("calculation", ["monthly", "window"])
+@pytest.mark.parametrize(
+    "criteria,expected",
+    [
+        ({}, 4),
+        ({"bedrooms": [4]}, 2),
+        ({"bedrooms": [0]}, 0),
+        ({"size_ranges": [[None, 500], [500, 700], [900, None]]}, 3),
+    ],
+)
+def test_statistics_optional_dimensions_and_range_semantics(
+    conn, config_factory, criteria, expected, calculation,
+):
+    entry = config_factory([{
+        "name": "泓都",
+        "url": "https://hk.centanet.com/findproperty/list/transaction/x_2-Y",
+        **criteria,
+    }]).entry("泓都")
+    for index, (bedrooms, area) in enumerate([(4, 500), (6, 900), (None, 700), (2, 800)]):
+        db.insert_transaction(
+            conn,
+            make_transaction(tx_id=str(index), ins_date=date(2026, 6, 1),
+                             bedrooms=bedrooms, saleable_area=area, saleable_unit_price=20_000),
+            MATCH, NOW,
+        )
+    if calculation == "monthly":
+        series = trend.monthly_series(conn, "泓都", "sale", TODAY, entry=entry)
+        assert series["points"] == ([
+            {"month": "2026-06", "median_unit_price": 20_000, "samples": expected},
+        ] if expected else [])
+    else:
+        series = trend.bucket_trend(conn, "泓都", "sale", TODAY, entry=entry)
+        assert series["recent"]["samples"] == expected
+    if not criteria:
+        assert series["scope_label"] == "不限間隔及面積"
+
+
+def test_filtering_does_not_turn_first_qualifying_sale_into_archive_start(conn, config_factory):
+    entry = config_factory().entry("泓都")
+    db.insert_transaction(
+        conn, make_transaction(tx_id="archive-start", ins_date=date(2026, 5, 1), bedrooms=1),
+        MATCH, NOW,
+    )
+    add(conn, date(2026, 6, 15), 20_000)
+    # July has transactions, but none meeting the current criteria.
+    db.insert_transaction(
+        conn, make_transaction(tx_id="unqualified-month", ins_date=date(2026, 7, 1), bedrooms=1),
+        MATCH, NOW,
+    )
+    series = trend.monthly_series(conn, "泓都", "sale", TODAY, entry=entry)
+    assert series["points"] == [
+        {"month": "2026-06", "median_unit_price": 20_000, "samples": 1},
+    ]
+    assert series["partial_first_month"] is None

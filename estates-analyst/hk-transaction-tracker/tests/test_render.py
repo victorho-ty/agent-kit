@@ -36,6 +36,8 @@ SERIES = {
         {"month": "2026-07", "median_unit_price": 22_500.0, "samples": 2},
     ],
     "partial_first_month": None,
+    "scope_label": "符合設定條件：2房、3房；500-700呎",
+    "criteria": {"bedrooms": [2, 3], "size_ranges": [{"low": 500, "high": 700}]},
 }
 
 
@@ -47,10 +49,21 @@ def test_a_table_is_drawn(tmp_path):
     assert path.stat().st_size > 5_000       # a real image, not an empty canvas
 
 
-def test_a_chart_is_drawn(tmp_path):
+def test_a_chart_is_drawn(tmp_path, monkeypatch):
+    from matplotlib.axes import Axes
+
+    titles = []
+    set_title = Axes.set_title
+
+    def capture_title(self, label, *args, **kwargs):
+        titles.append(label)
+        return set_title(self, label, *args, **kwargs)
+
+    monkeypatch.setattr(Axes, "set_title", capture_title)
     path = render.render_chart(SERIES, out_dir=tmp_path)
     assert path.exists()
     assert path.stat().st_size > 5_000
+    assert any(SERIES["scope_label"] in title for title in titles)
 
 
 def test_the_price_headings_follow_the_side_of_the_market():

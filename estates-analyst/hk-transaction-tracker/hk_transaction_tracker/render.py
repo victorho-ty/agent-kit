@@ -369,8 +369,9 @@ def render_chart(series: dict, *, out_dir: Path | None = None) -> Path:
     for side in ("left", "bottom"):
         axes.spines[side].set_color(GRID)
 
+    scope_label = series.get("scope_label", "不限間隔及面積")
     axes.set_title(
-        f"{series['label']} · {series['deal_label']} 呎價(實) 月中位數",
+        f"{series['label']} · {series['deal_label']} 呎價(實) 月中位數\n{scope_label}",
         fontsize=12, fontweight="bold", color=INK, fontfamily=families, pad=10,
     )
     axes.set_ylabel(fmt.unit_price_label(deal_type), fontsize=9, color=MUTED, fontfamily=families)
@@ -382,8 +383,9 @@ def render_chart(series: dict, *, out_dir: Path | None = None) -> Path:
         xy=(len(values) - 1, values[-1]), xytext=(0, 9), textcoords="offset points",
         ha="right", fontsize=9, fontweight="bold", color=LINE, fontfamily=families,
     )
+    scope = "符合設定條件" if series.get("criteria") else ""
     note = (
-        f"每點為該月成交呎價中位數，共 {sum(point['samples'] for point in points)} 宗。"
+        f"每點為該月{scope}成交呎價中位數，共 {sum(point['samples'] for point in points)} 宗。"
         "縱軸不由零開始。"
     )
     partial = series.get("partial_first_month")

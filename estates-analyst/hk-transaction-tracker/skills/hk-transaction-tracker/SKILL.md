@@ -118,11 +118,14 @@ and most of them on a new development. Those deals are reported in their own
 group with an em dash for area and 呎價, and they are excluded from every
 median, percentage and chart. Report the 成交價; do not estimate the 呎價.
 
-**The trend is the whole estate, not your criteria.** Every `trend` line covers
-all residential transactions in that estate on that side of the market,
-including the ones that failed the 間隔 and 面積 filters, because a median over
-the two or three deals matching a narrow filter is noise. Say "the estate" when
-relaying it, not "your two-bedroom flats".
+**Trends use current criteria.** Every `trend` line and monthly chart includes
+only transactions satisfying the current configured bedroom and saleable-size
+criteria. Required dimensions must be published. Relay the scope and sample
+counts supplied by the tool; do not describe a filtered trend as estate-wide.
+
+Empty criteria impose no filter. Months without qualifying transactions are
+omitted. Chart-point and window sample thresholds apply after filtering, and
+archived transactions are rechecked when criteria change.
 
 **Every trend line names its sample size. Keep it.** `基準` matters more than
 the percentage: `basis: "insufficient"` means there were too few transactions to

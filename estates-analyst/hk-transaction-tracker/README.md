@@ -57,6 +57,14 @@ docs/DESIGN.md                   why it is built this way
 
 ## Notes
 
+All trend summaries and monthly chart points use the estate’s **current bedroom
+and saleable-size criteria**, rechecked against archived transactions rather
+than stored notification match flags. All configured dimensions must be
+published and pass; empty criteria impose no filter. Months without qualifying
+transactions are omitted, and the minimum chart-point count applies after
+filtering. Window comparisons also apply their minimum sample count after
+filtering; titles and summary lines name the configured scope.
+
 - Centanet serves **at most 100 records per estate** and honours no offset, so
   the archive is the only memory of anything older. Nothing here deletes a row.
 - 呎租 and 呎價 live in the same source field. Nothing in this package averages

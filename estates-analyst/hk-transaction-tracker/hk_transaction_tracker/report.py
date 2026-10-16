@@ -6,16 +6,15 @@ The grouping is the specification: 買賣 before 租賃, then estate, then 間�
 token argument: nine new transactions across three estates cost nine formatted
 lines, not nine paragraphs of a model deciding again how to write a price.
 
-Two things are deliberately kept apart from each other:
+The report distinguishes notification eligibility from statistical eligibility:
 
 * **The new transactions** are exactly what the operator asked to be told about
   -- their 間隔, their 面積, their 成交價 and their 呎價(實).
-* **The trend** is the whole estate, matched or not, because a median over the
-  handful of transactions passing a narrow filter is not a market level.
+* **Trends and monthly charts** use the current configured bedroom and size
+  criteria. Only transactions with every required dimension published and
+  passing qualify.
 
-A reader who is shown both and told which is which can hold them at once. A
-reader shown one labelled as the other cannot, which is why every trend line
-names its sample size.
+Every trend line names its sample size so the reader can assess its basis.
 
 **A flagged deal is announced and never averaged.** ``db.set_excluded`` takes a
 transaction out of every median, average and chart point, but it stays in the
@@ -222,7 +221,7 @@ def _summary_lines(groups: list[dict], trends: list[dict], today: date, held_bac
                 lines.extend(f"　　{item['line']}" for item in estate["area_pending"])
 
     if trends:
-        lines.append("【呎價(實)走勢．全屋苑成交】")
+        lines.append("【呎價(實)走勢．符合目前設定條件的成交】")
         lines.extend(trend.summarise(item) for item in trends)
 
     if held_back:
@@ -272,15 +271,14 @@ def build(
 
         groups = _group(rows, config)
 
-        # The trend is estate-wide, so it is computed for every bucket that has
-        # news -- not for every bucket in the config. An estate with nothing new
-        # this run does not get a paragraph about its unchanged median.
+        # Only buckets with news get a trend summary in this report.
         trends = [
             trend.bucket_trend(
                 conn, estate["estate"], group["deal_type"], today,
                 window_days=config.trend_window_days,
                 min_samples=config.trend_min_samples,
                 label=estate["display"],
+                entry=config.entry(estate["estate"]),
             )
             for group in groups for estate in group["estates"]
         ]
@@ -310,6 +308,7 @@ def build(
                     series = trend.monthly_series(
                         conn, estate["estate"], group["deal_type"], today,
                         months=config.chart_months, label=estate["display"],
+                        entry=config.entry(estate["estate"]),
                     )
                     if len(series["points"]) < config.chart_min_points:
                         continue
@@ -318,7 +317,10 @@ def build(
                         "kind": "chart",
                         "deal_type": group["deal_type"],
                         "estate": estate["estate"],
-                        "label": f"{estate['display']} {group['deal_label']} 呎價(實)走勢",
+                        "label": (
+                            f"{estate['display']} {group['deal_label']} 呎價(實)走勢"
+                            f"（{series['scope_label']}）"
+                        ),
                         "path": str(path),
                         "points": len(series["points"]),
                     })
@@ -395,11 +397,13 @@ def history(
             conn, estate, deal_type, today,
             window_days=config.trend_window_days,
             min_samples=config.trend_min_samples,
+            entry=entry,
             label=entry.display if entry else estate,
         )
         series = trend.monthly_series(
             conn, estate, deal_type, today,
             months=months or config.chart_months,
+            entry=entry,
             label=entry.display if entry else estate,
         )
 

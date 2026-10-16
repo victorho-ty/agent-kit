@@ -164,7 +164,7 @@ The grouped summary of everything matched and not yet delivered.
   "images": [
     {"kind": "table", "deal_type": "sale", "label": "買賣新增成交", "path": "…/table-sale.png"},
     {"kind": "chart", "deal_type": "sale", "estate": "泓都",
-     "label": "泓都 Island Harbourview 買賣 呎價(實)走勢", "path": "…/chart-泓都-sale.png",
+     "label": "泓都 Island Harbourview 買賣 呎價(實)走勢（符合設定條件：2房、3房；500-700呎）", "path": "…/chart-泓都-sale.png",
      "points": 11}
   ],
   "committed": true,
@@ -209,7 +209,7 @@ Past numbers for one estate on one side of the market. Read-only.
               "excluded": 0, "earliest": "2025-09-25", "latest": "2026-08-17"},
   "excluded": 0,
   "trend": { /* as below */ },
-  "trend_line": "泓都 Island Harbourview · 買賣 呎價(實)：近90日中位數 …",
+  "trend_line": "泓都 Island Harbourview · 買賣 呎價(實)（符合設定條件：2房、3房；500-700呎）：近90日中位數 …",
   "monthly": [{"month": "2025-10", "median_unit_price": 18444.5, "samples": 4}],
   "transactions": [ /* the same item shape as `report`, each with a `line`;
                        flagged rows are included and marked */ ],
@@ -217,9 +217,19 @@ Past numbers for one estate on one side of the market. Read-only.
 }
 ```
 
+All trend summaries and monthly chart points use the estate’s **current bedroom
+and saleable-size criteria**, rechecked against archived transactions rather
+than stored notification match flags. All configured dimensions must be
+published and pass; empty criteria impose no filter. Months without qualifying
+transactions are omitted, and the minimum chart-point count applies after
+filtering. Window comparisons also apply their minimum sample count after
+filtering; titles and summary lines name the configured scope.
+
 `archive.earliest` is where the archive begins, not where the estate's history
 begins. There is nothing behind it. `total`, `priced` and the span cover what the
-statistics cover; `excluded` counts the flagged rows they leave out.
+unflagged archive covers, before bedroom and size filtering. The `trend.archive`
+counts describe only currently qualifying priced transactions; `excluded` counts
+flagged rows across the estate and deal type, before criteria filtering.
 
 ---
 

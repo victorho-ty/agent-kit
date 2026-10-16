@@ -7,11 +7,10 @@ transactions a month, and one penthouse or one distressed sale moves a mean by
 ten per cent. The median of four numbers is blunt, but it is not a lie about the
 middle of the market.
 
-**Estate-wide, not filtered.** The trend counts every residential transaction in
-the estate, including the ones that failed the operator's 間隔 and 面積 filters.
-The alternative -- a trend over just the tracked two-bedroom 500-650呎 flats --
-is a median over one or two data points a quarter, which is noise wearing a
-percentage sign.
+**Current criteria apply to every trend and monthly chart.** Only transactions
+satisfying every configured 間隔 and 面積 filter qualify; missing required
+dimensions cannot qualify. Archived match flags describe notification
+eligibility at ingestion, so statistics recheck the current criteria.
 
 **呎價(實) only.** Never 成交價. A quarter that happened to transact larger
 flats would show a rising 成交價 and a falling market, and the two are not
@@ -38,7 +37,9 @@ import statistics
 from datetime import date, timedelta
 
 from . import db, settings
-from .models import DEAL_LABELS
+from .config.estates import EstateEntry
+from .match import bedrooms_match, find_range
+from .models import DEAL_LABELS, bedroom_label
 
 # Below this, a percentage is rounding noise on a four-sample median rather than
 # a direction, and is reported as flat.
@@ -58,6 +59,36 @@ def _window(rows: list[dict], start: date, end: date) -> list[float]:
     ]
 
 
+def _qualified(rows: list[dict], entry: EstateEntry | None) -> list[dict]:
+    """Recheck current criteria; notification matching allows unknown dimensions."""
+    if entry is None:
+        return rows
+    return [
+        row for row in rows
+        if (not entry.bedrooms or bedrooms_match(row["bedrooms"], entry.bedrooms))
+        and (not entry.size_ranges or (
+            row["saleable_area"] is not None
+            and find_range(row["saleable_area"], entry.size_ranges) is not None
+        ))
+    ]
+
+
+def _scope(entry: EstateEntry | None) -> dict:
+    dimensions = []
+    if entry is not None:
+        if entry.bedrooms:
+            dimensions.append("、".join(bedroom_label(count) for count in entry.bedrooms))
+        if entry.size_ranges:
+            dimensions.append("、".join(band.label for band in entry.size_ranges))
+    return {
+        "criteria": {
+            "bedrooms": list(entry.bedrooms),
+            "size_ranges": [band.to_dict() for band in entry.size_ranges],
+        } if entry is not None else None,
+        "scope_label": "符合設定條件：" + "；".join(dimensions) if dimensions else "不限間隔及面積",
+    }
+
+
 def bucket_trend(
     conn,
     estate: str,
@@ -67,9 +98,12 @@ def bucket_trend(
     window_days: int = settings.DEFAULT_TREND_WINDOW_DAYS,
     min_samples: int = settings.DEFAULT_TREND_MIN_SAMPLES,
     label: str | None = None,
+    entry: EstateEntry | None = None,
 ) -> dict:
     """The last ``window_days`` of 呎價(實) against the ``window_days`` before them."""
-    rows = db.query(conn, estate=estate, deal_type=deal_type, with_unit_price=True)
+    rows = _qualified(
+        db.query(conn, estate=estate, deal_type=deal_type, with_unit_price=True), entry,
+    )
 
     recent_start = today - timedelta(days=window_days - 1)
     previous_end = recent_start - timedelta(days=1)
@@ -100,6 +134,7 @@ def bucket_trend(
         "label": label or estate,
         "deal_type": deal_type,
         "deal_label": DEAL_LABELS.get(deal_type, deal_type),
+        **_scope(entry),
         "window_days": window_days,
         "min_samples": min_samples,
         # How many flagged rows are not in any figure above. Named separately
@@ -136,12 +171,18 @@ def monthly_series(
     *,
     months: int = settings.DEFAULT_CHART_MONTHS,
     label: str | None = None,
+    entry: EstateEntry | None = None,
 ) -> dict:
     """Monthly medians of 呎價(實), oldest first -- the line a chart draws.
 
-    Months with no transaction are omitted rather than zero-filled: a gap in a
-    small block's history is an absence of evidence, and a line dropping to zero
-    for August would read as a collapse.
+    When an entry is configured, every required dimension must be published
+    and pass its current criteria. With no entry, no size or bedroom filter
+    applies. Archive coverage remains estate-wide when detecting a partial
+    first month: the first qualifying sale need not be the first archived sale.
+
+    Months with no qualifying transaction are omitted rather than zero-filled:
+    a gap in a small block's history is an absence of evidence, and a line
+    dropping to zero for August would read as a collapse.
 
     The oldest month is dropped when the archive begins part-way through it.
     Centanet serves the newest hundred records and nothing older, so the first
@@ -156,6 +197,8 @@ def monthly_series(
         conn, estate=estate, deal_type=deal_type, since=cutoff,
         with_unit_price=True, newest_first=False,
     )
+
+    rows = _qualified(rows, entry)
 
     grouped: dict[str, list[float]] = {}
     for row in rows:
@@ -186,6 +229,7 @@ def monthly_series(
         "deal_type": deal_type,
         "deal_label": DEAL_LABELS.get(deal_type, deal_type),
         "months": months,
+        **_scope(entry),
         "points": points,
         "excluded": db.excluded_count(conn, estate=estate, deal_type=deal_type),
         # Reported rather than hidden: "the archive starts here" is a fact about
@@ -200,7 +244,10 @@ def summarise(trend: dict) -> str:
 
     recent = trend["recent"]
     previous = trend["previous"]
-    head = f"{trend['label']} · {trend['deal_label']} 呎價(實)"
+    head = (
+        f"{trend['label']} · {trend['deal_label']} 呎價(實)"
+        f"（{trend['scope_label']}）"
+    )
 
     if trend["basis"] == "no_data":
         return f"{head}：檔案內未有可計算呎價的成交。"

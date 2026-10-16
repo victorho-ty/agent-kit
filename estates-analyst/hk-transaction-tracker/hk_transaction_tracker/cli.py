@@ -147,6 +147,7 @@ def cmd_trend(args) -> int:
                 conn, row["estate"], row["deal_type"], today,
                 window_days=config.trend_window_days,
                 min_samples=config.trend_min_samples,
+                entry=entry,
                 label=entry.display if entry else row["estate"],
             ))
         return _emit({

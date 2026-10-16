@@ -52,13 +52,18 @@ otherwise the next good run announces the back catalogue. Tested.
 
 ## 4. Unmatched transactions are stored anyway
 
-The criteria decide what is **announced**. The archive holds everything
-residential, because the trend is estate-wide.
+The archive holds every residential transaction, including unmatched ones.
+Notification eligibility is recorded at ingestion; statistical eligibility is
+rechecked against the current configuration. Keeping unmatched transactions
+allows revised bedroom and size criteria to apply to the full archived history.
 
-A median over the two or three deals a quarter that match "2房, 500–700呎" is
-noise wearing a percentage sign. A median over every flat in the block is a
-market level. Storing only the matches would make the estate-wide trend
-unrecoverable after the fact, and it costs nothing to keep the rest.
+All trend summaries and monthly chart points use the estate’s **current bedroom
+and saleable-size criteria**, rechecked against archived transactions rather
+than stored notification match flags. All configured dimensions must be
+published and pass; empty criteria impose no filter. Months without qualifying
+transactions are omitted, and the minimum chart-point count applies after
+filtering. Window comparisons also apply their minimum sample count after
+filtering; titles and summary lines name the configured scope.
 
 ## 5. A missing dimension cannot reject a transaction
 

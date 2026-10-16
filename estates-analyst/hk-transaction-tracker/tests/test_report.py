@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 
-from hk_transaction_tracker import db, fmt, report
+from hk_transaction_tracker import cli, clock, db, fmt, render, report
 from hk_transaction_tracker.config.estates import SizeRange
 from hk_transaction_tracker.match import MatchResult
 
@@ -139,3 +140,93 @@ def test_prices_are_written_the_way_hong_kong_writes_them():
     assert fmt.price(128_000_000, "sale") == "$1.28億"
     assert fmt.price(42_500, "rental") == "$42,500/月"
     assert fmt.price(None, "sale") == fmt.EM_DASH
+
+
+@pytest.mark.parametrize("command", ["report", "history"])
+@pytest.mark.parametrize("qualifying_months", [2, 3])
+def test_charts_use_configured_criteria_and_qualified_month_threshold(
+    config, conn, monkeypatch, tmp_path, command, qualifying_months,
+):
+    captured = []
+
+    def capture_chart(series, **kwargs):
+        captured.append(series)
+        return tmp_path / "chart.png"
+
+    monkeypatch.setattr(render, "render_chart", capture_chart)
+    monkeypatch.setattr(render, "render_table", lambda *args, **kwargs: tmp_path / "table.png")
+    monkeypatch.setattr(render, "sweep", lambda *args: None)
+    monkeypatch.setattr(render, "cjk_font", lambda: None)
+    for month in (5, 6, 7):
+        add(conn, tx_id=f"unqualified-{month}", ins_date=date(2026, month, 1),
+            bedrooms=1, saleable_unit_price=90_000)
+    for month in range(5, 5 + qualifying_months):
+        add(conn, tx_id=f"qualified-{month}", ins_date=date(2026, month, 15),
+            bedrooms=2, saleable_unit_price=20_000)
+
+    if command == "report":
+        payload = report.build(config, conn=conn, out_dir=tmp_path)
+    else:
+        payload = report.history(config, "泓都", "sale", conn=conn, draw=True, out_dir=tmp_path)
+    charts = [image for image in payload["images"] if image["kind"] == "chart"]
+    if qualifying_months == 2:
+        assert charts == []
+        assert captured == []
+    else:
+        assert len(charts) == 1
+        assert captured[0]["points"] == [
+            {"month": f"2026-{month:02}", "median_unit_price": 20_000, "samples": 1}
+            for month in (5, 6, 7)
+        ]
+
+
+@pytest.mark.parametrize("command", ["report", "history", "trend"])
+@pytest.mark.parametrize("deal_type,unit_price", [("sale", 20_000), ("rental", 50)])
+@pytest.mark.parametrize("qualified_count", [0, 2, 3])
+def test_all_trend_outputs_use_current_criteria_and_label_the_scope(
+    config, conn, monkeypatch, command, deal_type, unit_price, qualified_count,
+):
+    today = date(2026, 8, 29)
+    monkeypatch.setattr(clock, "today", lambda: today)
+    for window, offset, price in [("recent", 5, unit_price * 2), ("previous", 100, unit_price)]:
+        for index in range(qualified_count):
+            db.insert_transaction(
+                conn, make_transaction(
+                    tx_id=f"{window}-qualified-{index}", deal_type=deal_type,
+                    ins_date=today - timedelta(days=offset + index),
+                    saleable_unit_price=price,
+                ), MatchResult(matched=False, reason="previous config"), NOW,
+            )
+        for index, fields in enumerate([
+            {"bedrooms": 1}, {"saleable_area": 800}, {"bedrooms": None},
+        ]):
+            add(conn, tx_id=f"{window}-unqualified-{index}", deal_type=deal_type,
+                ins_date=today - timedelta(days=offset + index),
+                saleable_unit_price=price * 10, **fields)
+    if command == "report":
+        payload = report.build(config, conn=conn, draw=False)
+        movement = payload["trends"][0]
+        lines = payload["summary_lines"]
+        assert "【呎價(實)走勢．符合目前設定條件的成交】" in lines
+    elif command == "history":
+        payload = report.history(config, "泓都", deal_type, conn=conn)
+        movement = payload["trend"]
+        lines = [payload["trend_line"]]
+    else:
+        monkeypatch.setattr(cli, "load_config", lambda: config)
+        monkeypatch.setattr(db, "connect", lambda: conn)
+        monkeypatch.setattr(cli, "_emit", lambda payload: payload)
+        payload = cli.cmd_trend(SimpleNamespace(estate=["泓都"], deal=deal_type))
+        movement = payload["trends"][0]
+        lines = payload["summary_lines"]
+    assert movement["recent"]["samples"] == qualified_count
+    assert movement["previous"]["samples"] == qualified_count
+    assert movement["criteria"]["bedrooms"] == [2, 3]
+    assert any("符合設定條件：2房、3房；500-700呎" in line for line in lines)
+    assert all("全屋苑" not in line for line in lines)
+    if qualified_count == 3:
+        assert movement["pct"] == 100.0
+        assert movement["basis"] == "ok"
+    else:
+        assert movement["pct"] is None
+        assert movement["basis"] == ("no_data" if qualified_count == 0 else "insufficient")

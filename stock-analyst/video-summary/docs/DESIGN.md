@@ -139,7 +139,7 @@ Three constraints, all in the code:
   is answering nothing.
 
 The label also reaches the agent, so a sixty-second clip from a feed that keeps
-its Shorts gets a two-sentence summary rather than a paragraph.
+its Shorts gets one or two brief summary bullets.
 
 ## 7. Where the model is, and where it is not
 

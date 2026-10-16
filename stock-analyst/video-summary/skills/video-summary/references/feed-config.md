@@ -4,6 +4,16 @@
 `//` comments are stripped before parsing, so disabled examples can live in the
 file as documentation.
 
+## Environment overrides
+
+- `VIDEO_SUMMARY_DB`: defaults to
+  `~/.local/share/hermes-video-summary/video_summary.db`.
+- `VIDEO_SUMMARY_TRANSCRIPTS`: transcript storage directory.
+- `VIDEO_SUMMARY_CONFIG`: alternate `feeds.json` path.
+- `VIDEO_SUMMARY_TZ`: defaults to `Asia/Hong_Kong`; config `timezone` wins.
+- `VIDEO_SUMMARY_TIMEOUT`, `VIDEO_SUMMARY_RETRIES`: request controls.
+- `VIDEO_SUMMARY_PROXY`: caption-fetching proxy; see IpBlocked below.
+
 ## Global keys
 
 | key | default | meaning |

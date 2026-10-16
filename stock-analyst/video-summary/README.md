@@ -3,9 +3,11 @@
 An agent skill plus the deterministic Python tools behind it. A check runs every
 X hours over a configured list of YouTube channel feeds, stores what is new,
 and fetches the transcript of anything it has not sent yet. The agent reads that
-transcript and writes what a swing trader needs to know from it — instruments,
-levels, claims and who made them — then sends it over Telegram as one message
-with the link. It never decides what is new, and it never computes a number.
+transcript and writes concise bullets for a swing trader — momentum, regime
+changes, market events, forecasts and policy views, attributed to the speaker
+and grouped when useful. It omits promotional content, then sends one Telegram
+message with the link. It never decides what is new, and it never computes a
+number.
 
 ```
 video-summary/

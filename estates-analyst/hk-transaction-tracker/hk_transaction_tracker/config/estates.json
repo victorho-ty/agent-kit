@@ -104,6 +104,15 @@
       "enabled": true
     },
     {
+      "name": "豐寧大廈",
+      "label": "豐寧大廈",
+      "url": "https://hk.centanet.com/findproperty/list/transaction/%E8%B1%90%E5%AF%A7%E5%A4%A7%E5%BB%88_2-SKPDBPDXPK",
+      "bedrooms": [],
+      "size_ranges": [[600, 1800]],
+      "track": ["sale", "rental"],
+      "enabled": true
+    },
+    {
       "name": "CaymanRise",
       "label": "CaymanRise",
       "url": "https://hk.centanet.com/findproperty/list/transaction/%E5%8A%A0%E6%83%A0%E8%87%BA_2-SSPPWPPEPS",

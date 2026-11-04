@@ -78,3 +78,17 @@ accepts integers from 1 to 20000000; the default stays 3 MB. It applies only to
 the source listing request. Article evidence and detail fetches retain the default
 3 MB cap. `max_items: 15` bounds candidates after parsing; it does not limit the
 publisher's response. Conditional GET remains enabled. No parser change is needed.
+
+## DeepLearning.AI
+
+`deeplearning-ai-letters` use category `ai`
+and kind `html` with static rendering. Their public section pages contain dated
+`article.card` elements; no RSS link was advertised and section `/rss/` URLs
+returned 404 when checked on 2026-10-18. No browser or new parser is required.
+
+The title is `h3`, article URL is `a[aria-label]@href`, preview is `.card-body > p`,
+and publication text is `footer > span:first-child`. Selecting the labeled overlay
+link avoids the earlier tag/navigation link inside each card. Each scan collects
+up to 15 cards. These sources appear in `feed_jobs` and use the same scan,
+shortlist, article evidence, summarization and HTML delivery stages as RSS items.
+The initial scan seeds the currently listed backlog under the existing policy.

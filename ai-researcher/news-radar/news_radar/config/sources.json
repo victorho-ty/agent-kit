@@ -42,6 +42,26 @@
       "max_response_bytes": 15000000
     },
     {
+      "name": "deeplearning-ai-letters", "category": "ai", "kind": "html",
+      "url": "https://www.deeplearning.ai/the-batch/tag/letters/",
+      "list_selector": "article.card",
+      "fields": {
+        "title": "h3", "link": "a[aria-label]@href",
+        "summary": ".card-body > p", "date": "footer > span:first-child"
+      },
+      "max_items": 8
+    },
+    {
+      "name": "rikiyat-blog", "category": "ai", "kind": "html",
+      "url": "https://rikiyat.github.io/blog/",
+      "list_selector": "ul.blog-list > li.blog-card",
+      "fields": {
+        "title": ".blog-card__title a", "link": ".blog-card__title a@href",
+        "summary": ".blog-card__teaser"
+      },
+      "max_items": 10
+    },
+    {
       "name": "hacker-news", "category": "community", "kind": "search",
       "url": "https://news.ycombinator.com/",
       "query": "site:news.ycombinator.com {topic} {today}", "max_items": 5

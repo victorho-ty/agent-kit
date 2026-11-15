@@ -18,8 +18,8 @@ uv sync
 ln -s "$PWD/.venv/bin/fedctl" ~/.local/bin/fedctl
 ```
 
-No API key. The two sources are the New York Fed's public rates endpoint and
-Yahoo's dated CBOT futures.
+No API key required. Probabilities use the New York Fed's public rates endpoint
+and Yahoo's dated CBOT futures. Catalyst context comes from CNBC Economy RSS.
 
 ## Use
 
@@ -30,12 +30,30 @@ fedctl history --limit 20       # the last 20 reported changes, summarised and c
 fedctl meetings                 # the calendar, and the contract behind each date
 ```
 
-Every command prints one JSON object. `check-changes --quiet` prints a bare
-`1` or `0` so a cron wrapper can gate a wake-up:
+The default alert cutoff is **5.0 percentage points**. Pass `--threshold` or
+set `FED_WATCH_CHANGE_THRESHOLD` to override it. A qualifying odds move includes
+recent CNBC Economy stories for the alert agent to assess.
+
+### Scheduled alerts
+
+Save this pre-check as `fed-watch-check.sh` under the stock-analyst profile's
+Hermes scripts directory (the profile's `$HERMES_HOME/scripts`).
+
+```sh
+#!/bin/sh
+exec "$HOME/.local/bin/fedctl" check-changes --hermes-cron
+```
+
+In that profile, attach the script and skill to the existing alert job.
 
 ```bash
-[ "$(fedctl check-changes --quiet)" -eq 1 ] && hermes-run fed-watch-alert
+hermes cron edit fed-watch-alert --script fed-watch-check.sh --add-skill fed-watch \
+  --prompt "Use the fed-watch skill to report the original change payload from the pre-check context."
 ```
+
+Use this job for polling and delivery in place of the separate `--quiet` polling
+wrapper. Quiet ticks skip the agent. The script passes the same diff and chart
+paths that triggered the wake-up. Put any `--threshold` override in the script.
 
 ## Keeping it running
 

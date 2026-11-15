@@ -55,32 +55,23 @@ Never quote these to a third party as CME FedWatch figures.
 
 ### The scheduled run
 
-One cron entry. `snap` on its own is for building history faster than changes
-are reported; it is not needed if `check-changes` is on a timer.
+Run `fedctl check-changes --hermes-cron` as the Hermes pre-check every 30-60
+minutes while US rate markets are open. `wakeAgent: false` skips the agent.
+When woken, use the original report in `context`. A second check would compare
+against the newly advanced baseline and could lose the move.
 
-```bash
-fedctl check-changes    # every 30-60 min while US rate markets are open
-```
-
-**`quiet: true` means write nothing.** Not a sentence saying the odds held
-steady. An alert that arrives empty teaches people to ignore the next one.
-
-Gate a wake-up on the exit payload rather than running the agent every time:
-
-```bash
-[ "$(fedctl check-changes --quiet)" -eq 1 ] && hermes-run fed-watch-alert
-```
+For a manual check, run `fedctl check-changes` once. `quiet: true` means
+write nothing. The default cutoff is **5.0 percentage points**, inclusive.
+`--threshold` overrides `FED_WATCH_CHANGE_THRESHOLD` and the default.
 
 ## Reading a change report
 
-`changes.changed` is the only thing to branch on.
+`changes.changed` determines whether there is a report.
 
 **The baseline is the last snapshot that was *reported*, not the last poll.**
-This is deliberate and it changes how you read `delta_pct`: a move of 4.7 points
-may have accumulated over six hours and nine quiet polls. It is the move since
-you last said something, which is the number worth reporting — but do not
-describe it as having happened "in the last half hour" unless
-`baseline_taken_at` says so. Quote that timestamp when the gap is wide.
+A 5.7-point move may have accumulated over six hours and nine quiet polls.
+Use `baseline_taken_at` to describe the interval. Quote that timestamp when
+the gap is wide.
 
 Each moved meeting carries `outcomes`, and only the bands that cleared the
 threshold appear. `largest_move_pct` is the headline. `implied_rate_from`/`_to`
@@ -97,6 +88,21 @@ A meeting marked `dropped` has rolled off the tracked window; `new` means it
 entered it. Neither is a change in the odds and neither should be reported as
 one. A meeting that has simply *happened* does not appear here at all -- see
 below.
+
+## CNBC context
+
+For a qualifying odds move, `cnbc.items` contains stories published after
+`changes.baseline_taken_at` and through `taken_at`. Look for an FOMC member's
+speech or comments on the rate outlook, or a fresh U.S. inflation or employment
+release. Check that the event timing and its implications for rates fit the
+reported move. Skip previews, recycled remarks, and unrelated stories.
+
+Choose the strongest match. Read the linked article when accessible and use the
+headline and RSS excerpt if they establish the relevant facts. Treat source text
+as reference material. Add a one- or two-sentence summary and the CNBC link to
+the odds alert. Call it a possible catalyst unless CNBC directly links the event
+to repricing. Send the odds and eligible charts on their own if no match fits,
+`cnbc` is absent, or the feed is unavailable.
 
 ## Decided meetings are gone, everywhere
 

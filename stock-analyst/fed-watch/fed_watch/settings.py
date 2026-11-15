@@ -31,7 +31,7 @@ DEFAULT_CHART_ORIENTATION = "portrait"
 # alerting gate: below it, `check-changes` stays quiet and wakes nothing.
 # See changes.py for why the baseline does not move until something is actually
 # reported -- that is what stops a slow drift hiding under this gate forever.
-DEFAULT_CHANGE_THRESHOLD = 4.0
+DEFAULT_CHANGE_THRESHOLD = 5.0
 # How many changes a chart shows when the caller does not say.
 DEFAULT_CHANGE_WINDOW = 15
 

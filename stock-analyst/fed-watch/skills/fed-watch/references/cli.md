@@ -104,11 +104,12 @@ hidden.
 Snap, then report what moved since the last snapshot that was *reported*.
 
 ```
---threshold P    percentage points a probability must move to count (default 4.0)
+--threshold P    inclusive minimum move in percentage points (default 5.0)
 --limit N        how many reported changes the charts cover (default 15)
 --meetings N     how many upcoming meetings to price (default 2)
 --no-fetch       diff the stored history without fetching; for replay and outages
 --quiet          print a bare 1 or 0 and nothing else
+--hermes-cron    emit a wakeAgent gate with the original report as context
 ```
 
 Adds to the snapshot shape:
@@ -118,9 +119,9 @@ Adds to the snapshot shape:
   "fetched": true,
   "changes": {
     "changed": true,
-    "threshold_pct": 4.0,
+    "threshold_pct": 5.0,
     "baseline_taken_at": "2026-09-12T09:00:00+08:00",
-    "largest_move_pct": 4.7,
+    "largest_move_pct": 5.7,
     "policy_changed": false,
     "policy_from": null,
     "meetings": [
@@ -132,9 +133,9 @@ Adds to the snapshot shape:
         "implied_rate_to": 3.7401,
         "expected_rate_from": 3.8469,
         "expected_rate_to": 3.8586,
-        "largest_move_pct": 4.7,
+        "largest_move_pct": 5.7,
         "outcomes": [
-          {"label": "25bp hike", "band": "3.75-4.00%", "from_pct": 86.7, "to_pct": 91.4, "delta_pct": 4.7}
+          {"label": "25bp hike", "band": "3.75-4.00%", "from_pct": 86.7, "to_pct": 92.4, "delta_pct": 5.7}
         ]
       }
     ]
@@ -156,7 +157,16 @@ A meeting's `status` is `moved`, `new` (not tracked at the baseline) or
 where it was, so a slow drift is measured from where it started rather than from
 an hour ago, and is reported once it accumulates past the threshold.
 
-`--no-fetch` diffs the most recent stored snapshot instead of taking a new one.
+A qualifying probability move adds `cnbc` with `status: "ok"`, `feed_url`,
+and `items` (headline, URL, publication timestamp, and RSS summary). Items
+are limited to the interval between snapshots. An RSS failure carries
+`status: "unavailable"` and `error`. The change report and charts still return.
+
+`--no-fetch` diffs the latest stored snapshot and skips the CNBC request.
+`--quiet` also skips the CNBC request. For scheduled delivery, use
+`--hermes-cron` in the Hermes pre-check script. It returns
+`{"wakeAgent": false}` on a quiet tick or
+`{"wakeAgent": true, "context": {...}}` with the original report.
 
 ## `fedctl history`
 
@@ -233,7 +243,7 @@ The calendar, and which contract answers each date. Fetches nothing.
 | `FED_WATCH_CHART_DIR` | `~/.local/share/hermes-stock-analyst/fedwatch-charts` |
 | `FED_WATCH_CHART_ORIENTATION` | `portrait` |
 | `FED_WATCH_CHART_RETENTION` | `7` (days) |
-| `FED_WATCH_CHANGE_THRESHOLD` | `4.0` (percentage points) |
+| `FED_WATCH_CHANGE_THRESHOLD` | `5.0` (percentage points) |
 | `FED_WATCH_CALENDAR` | the shipped `fed_watch/config/fomc.json` |
 | `FED_WATCH_TZ` | `Asia/Hong_Kong` |
 | `FED_WATCH_TIMEOUT` | `20.0` (seconds) |

@@ -4,13 +4,8 @@ Every command prints exactly one JSON object and exits with a code from
 :class:`fed_watch.errors.ExitCode`. The agent parses that object and branches on
 the exit code; it never reads stderr and never pattern-matches a sentence.
 
-The one deliberate exception is ``check-changes --quiet``, which prints a bare
-``0`` or ``1`` so a shell can gate on it without a JSON parser:
-
-    [ "$(fedctl check-changes --quiet)" -eq 1 ] && hermes-run fed-watch-alert
-
-Everything above that line runs on a timer and costs nothing. Only the last part
-wakes the agent, and only when something actually moved.
+For scheduled alerts, ``check-changes --hermes-cron`` hands the original report
+to the agent and gates its wake-up. ``--quiet`` prints a bare 0 or 1.
 """
 
 from __future__ import annotations
@@ -20,7 +15,7 @@ import json
 import sys
 
 from . import changes as changes_module
-from . import charts, clock, db, settings, snapshot
+from . import charts, clock, db, news, settings, snapshot
 from .config import fomc
 from .errors import ExitCode, FedWatchError, InsufficientDataError
 
@@ -109,6 +104,8 @@ def cmd_check_changes(args) -> int:
         }
 
         if not report["changed"]:
+            if args.hermes_cron:
+                return _emit({"wakeAgent": False})
             payload["quiet"] = True
             return _emit(payload)
 
@@ -118,7 +115,12 @@ def cmd_check_changes(args) -> int:
         history = db.reported_history(conn, args.limit)
         payload["charts"], payload["charts_skipped"] = _charts_for(history, args.limit)
         payload["reported_changes_plotted"] = len(history)
-        return _emit(payload)
+
+    if not args.no_fetch and report.get("largest_move_pct", 0) > 0:
+        payload["cnbc"] = news.recent(report["baseline_taken_at"], taken)
+    if args.hermes_cron:
+        return _emit({"wakeAgent": True, "context": payload})
+    return _emit(payload)
 
 
 def cmd_history(args) -> int:
@@ -229,7 +231,7 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument(
         "--threshold",
         type=float,
-        help="percentage points a probability must move to count (default 4.0)",
+        help=f"minimum move in percentage points (default {settings.DEFAULT_CHANGE_THRESHOLD:.1f})",
     )
     check.add_argument(
         "--limit",
@@ -246,10 +248,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="diff the stored history without fetching; for replay and outages",
     )
-    check.add_argument(
+    output = check.add_mutually_exclusive_group()
+    output.add_argument(
         "--quiet",
         action="store_true",
         help="print a bare 1 or 0 for a shell gate, and nothing else",
+    )
+    output.add_argument(
+        "--hermes-cron",
+        action="store_true",
+        help="gate a Hermes cron run and pass the original change report",
     )
     check.set_defaults(func=cmd_check_changes)
 

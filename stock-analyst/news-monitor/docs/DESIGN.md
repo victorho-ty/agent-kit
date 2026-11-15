@@ -44,20 +44,15 @@ The alternative was a feed-reader dependency. It would have been a second
 runtime package for about eighty lines of work against three formats that have
 not moved in twenty years, and the scheduler would have to keep it alive.
 
-## The ledger is stamped by `mark`, not by `check`
+## Reporting and editorial disposition
 
-The brief asked for "entries that have not been returned before", which reads as
-stamping on return. It is stamped on `mark` instead, after the agent has
-actually reported the item.
+Returning an item from `check` leaves it pending. `deliver` sends a digest and
+records delivery for its exact item IDs after Hermes confirms the send.
+`mark` acknowledges an independently confirmed send and is safe to repeat.
+A crash between platform acceptance and the ledger update can cause a repeat.
 
-Stamping on return loses headlines permanently whenever a run dies between the
-payload printing and the message going out — and the whole point of a ledger is
-that a crash costs nothing. The cost of the chosen design is the opposite
-failure: an item reported but not marked comes round again. Duplicated news is
-recoverable; lost news is not, and nobody knows it happened.
-
-This is also why `mark` is per-item rather than per-batch, and why marking an
-already-marked item succeeds instead of failing.
+`discard` records intentionally omitted in-scope items. The ledger retains
+their fingerprints so a later feed poll cannot requeue them.
 
 ## The cold start is absorbed silently
 
@@ -193,16 +188,16 @@ pending for retry. `status: partial` and `scope_filter.failures` expose these
 failures; `runs.detail` retains them. Authentication/configuration errors stop
 further calls for that run. Errors contain no API response body or key.
 
-Each check examines up to `--limit` pending items (default 40), which bounds
-classification work; exclusions can make the returned batch smaller. The SDK
+Each check classifies up to `--limit` unclassified items (default 40). It
+then returns up to the same limit of classified, in-scope pending items. The SDK
 uses a 20-second request timeout, at most three attempts, and a 60-second retry
 budget per story. No calls are made for absorbed history or dry runs.
 `pending_items` includes news awaiting a decision; `awaiting_scope` counts it.
-`items --pending` and `mark --all` cover only classified, in-scope news.
+`items --pending` and `mark --all` cover only classified, in-scope pending news.
 `items` without `--pending` is history and may include unclassified rows
 or exclusions retained by older versions: never use it as a reporting batch.
 
-Existing databases gain two nullable columns on connection. History is retained;
-previously pending stories receive classification on subsequent checks.
+Existing databases gain missing scope columns and `discarded_at` on connection.
+Existing history and pending rows are retained.
 
 API contract: https://docs.typesafe.ai/api

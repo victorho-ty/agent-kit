@@ -25,6 +25,7 @@ class ExitCode(IntEnum):
     ERR_FETCH = 20      # the only feed asked for could not be reached
     ERR_CANDIDATE = 21  # a url offered to `add` is not a usable feed
     ERR_NOT_FOUND = 30  # no feed with that name, no item with that id
+    ERR_DELIVERY = 40   # the sender did not confirm the digest
 
 
 class NewsMonitorError(Exception):
@@ -78,6 +79,11 @@ class CandidateError(NewsMonitorError):
 
     exit_code = ExitCode.ERR_CANDIDATE
     error = "ERR_CANDIDATE"
+
+
+class DeliveryError(NewsMonitorError):
+    exit_code = ExitCode.ERR_DELIVERY
+    error = "ERR_DELIVERY"
 
 
 class NotFoundError(NewsMonitorError):

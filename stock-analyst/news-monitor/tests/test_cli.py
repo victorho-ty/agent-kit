@@ -7,14 +7,17 @@ carrying a key, or an error that started arriving as a traceback.
 
 from __future__ import annotations
 
+import io
 import json
+import subprocess
 
 import pytest
 
-from news_monitor import gate
+from news_monitor import db, gate, scope
 from news_monitor.cli import run
 from news_monitor.errors import ExitCode
 from news_monitor.fetch import Response
+from news_monitor.models import Entry
 
 from .conftest import fixture_text
 
@@ -22,7 +25,8 @@ ACME = "https://wire.example.com/rss"
 
 
 @pytest.fixture(autouse=True)
-def isolated_db(tmp_path, monkeypatch):
+def isolated_db(tmp_path, monkeypatch, now):
+    monkeypatch.setattr("news_monitor.clock.now", lambda tz: now.astimezone(tz))
     monkeypatch.setenv("NEWS_MONITOR_DB", str(tmp_path / "news_monitor.db"))
     monkeypatch.setenv("NEWS_MONITOR_DELAY", "0")
 
@@ -170,6 +174,78 @@ def test_check_then_mark_drains_the_ledger(capsys, offline, monkeypatch):
 
     _, after = _run(capsys, ["check", "--feed", "acme"])
     assert after["items"] == []
+
+
+def _included_item(conn, now, name):
+    item_id = db.insert_item(
+        conn, Entry("wire", name, f"https://example.org/{name}", name),
+        category="markets", sectors=[], signals=[], now=now,
+    )
+    db.record_scope(conn, item_id, scope.Decision("include", 0.8, "jev-test").to_dict())
+    return str(item_id)
+
+
+def test_deliver_marks_only_after_send_and_retries_without_resending(capsys, monkeypatch, now):
+    conn = db.connect()
+    try:
+        sent_id = _included_item(conn, now, "included")
+        other_id = _included_item(conn, now, "other")
+        monkeypatch.setenv("NEWS_MONITOR_DELIVERY_TARGET", "telegram:123")
+        digest = "Rates move https://example.org/included"
+        send_results = iter([1, 0])
+        calls = []
+
+        def send(argv, *, input, **kwargs):
+            assert db.resolve_item(conn, sent_id).reported_at is None
+            calls.append((argv, input))
+            return subprocess.CompletedProcess(argv, next(send_results))
+
+        monkeypatch.setattr("news_monitor.cli.subprocess.run", send)
+        args = ["deliver", "--item", sent_id]
+        monkeypatch.setattr("sys.stdin", io.StringIO(digest))
+        code, failed = _run(capsys, args)
+        assert code == int(ExitCode.ERR_DELIVERY)
+        assert failed["error"] == "ERR_DELIVERY"
+        assert db.pending_count(conn)["pending_items"] == 2
+
+        monkeypatch.setattr("sys.stdin", io.StringIO(digest))
+        code, delivered = _run(capsys, args)
+        assert code == int(ExitCode.OK)
+        assert delivered["marked"] == [int(sent_id)]
+        assert [item.id for item in db.pending_items(conn, classified=True)] == [int(other_id)]
+
+        monkeypatch.setattr("sys.stdin", io.StringIO(digest))
+        _, retried = _run(capsys, args)
+        assert retried["already_marked"] == [int(sent_id)]
+        assert len(calls) == 2
+        argv, message = calls[0]
+        assert argv == ["hermes", "-p", "stock-analyst", "send", "--to", "telegram:123",
+                        "--file", "-", "--quiet"]
+        assert message == digest.encode("utf-8")
+    finally:
+        conn.close()
+
+
+def test_discard_is_a_distinct_idempotent_disposition(capsys, now):
+    conn = db.connect()
+    try:
+        item_id = _included_item(conn, now, "filler")
+        _, discarded = _run(capsys, ["discard", "--item", item_id])
+        assert discarded["discarded"] == [int(item_id)]
+        assert discarded["pending_items"] == 0
+
+        _, retried = _run(capsys, ["discard", "--item", item_id])
+        assert retried["already_discarded"] == [int(item_id)]
+        _, marked = _run(capsys, ["mark", "--item", item_id])
+        assert marked["marked"] == []
+        assert marked["already_discarded"] == [int(item_id)]
+        _, pending = _run(capsys, ["items", "--pending"])
+        assert pending["items"] == []
+        _, history = _run(capsys, ["items"])
+        assert history["items"][0]["discarded_at"] is not None
+        assert history["items"][0]["reported_at"] is None
+    finally:
+        conn.close()
 
 
 def test_check_with_no_enabled_feeds_is_a_clean_skip(capsys, offline):

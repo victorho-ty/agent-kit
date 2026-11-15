@@ -13,6 +13,7 @@ A failure prints `{"ok": false, "error": "ERR_...", "exit_code": N, "message":
 | 20 | `ERR_FETCH` | the only feed asked for could not be reached |
 | 21 | `ERR_CANDIDATE` | a url given to `add` is not a usable feed |
 | 30 | `ERR_NOT_FOUND` | no feed with that name, no item with that id |
+| 40 | `ERR_DELIVERY` | Hermes did not confirm the digest send |
 
 A per-feed failure during a `check` is **not** one of these. It lands in
 `feed_failures`, the run finishes `partial`, and the exit code stays 0.
@@ -91,7 +92,8 @@ each `sample` row carries `excluded_by`: the matching term, or `null`.
   "sector_hints": ["macro-rates"],
   "signals": [],
   "first_seen_at": "2026-09-19T00:13:14+08:00",
-  "reported_at": null
+  "reported_at": null,
+  "discarded_at": null
 }
 ```
 
@@ -183,22 +185,26 @@ that state — not an error, and the right answer on a retry.
 
 ---
 
-## `mark`
+## `deliver`, `discard`, and `mark`
 
 ```bash
+news-monitor deliver --item 1183 --item 1185 < digest.md
+news-monitor discard --item 1184
 news-monitor mark --item 1183
-news-monitor mark --all
 ```
 
-Takes a row id or a fingerprint, repeatable. `--all` stamps every pending item —
-use it only when the whole batch actually went out.
+`deliver` takes the numeric IDs included in the digest and requires their
+original URLs in the text. It sends through `hermes -p stock-analyst send` to
+`NEWS_MONITOR_DELIVERY_TARGET` and stamps only those IDs on success. An
+already-delivered batch is safe to retry. A send failure leaves the IDs pending.
 
-```json
-{"ok": true, "marked": [1183], "already_marked": [], "pending_items": 0}
-```
+`discard` retains omitted in-scope rows in history with `discarded_at`.
+Its result lists newly discarded IDs in `discarded`. Repeating a discard
+lists the IDs in `already_discarded`.
 
-`already_marked` is not an error: a repeated mark after a retried send is
-exactly right.
+`mark` acknowledges an external send that has already succeeded.
+`mark` and `discard` also accept fingerprints. `mark --all` selects every
+classified pending item across the ledger. Use explicit IDs for a capped batch.
 
 ---
 
@@ -257,16 +263,16 @@ pending for retry. `status: partial` and `scope_filter.failures` expose these
 failures; `runs.detail` retains them. Authentication/configuration errors stop
 further calls for that run. Errors contain no API response body or key.
 
-Each check examines up to `--limit` pending items (default 40), which bounds
-classification work; exclusions can make the returned batch smaller. The SDK
+Each check classifies up to `--limit` unclassified items (default 40). It
+then returns up to the same limit of classified, in-scope pending items. The SDK
 uses a 20-second request timeout, at most three attempts, and a 60-second retry
 budget per story. No calls are made for absorbed history or dry runs.
 `pending_items` includes news awaiting a decision; `awaiting_scope` counts it.
-`items --pending` and `mark --all` cover only classified, in-scope news.
+`items --pending` and `mark --all` cover only classified, in-scope pending news.
 `items` without `--pending` is history and may include unclassified rows
 or exclusions retained by older versions: never use it as a reporting batch.
 
-Existing databases gain two nullable columns on connection. History is retained;
-previously pending stories receive classification on subsequent checks.
+Existing databases gain missing scope columns and `discarded_at` on connection.
+Existing history and pending rows are retained.
 
 API contract: https://docs.typesafe.ai/api

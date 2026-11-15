@@ -42,15 +42,29 @@ export NEWS_MONITOR_CONTACT="you@example.com"
 news-monitor check                  # the cron entry
 news-monitor feeds                  # the source list and its health
 news-monitor add --url <url> --category markets
-news-monitor mark --item <id>       # after the item has been reported
+news-monitor discard --item <id>    # intentionally omit an in-scope headline
+news-monitor mark --item <id>       # acknowledge an already confirmed external send
 news-monitor runs --limit 3         # liveness
 ```
 
-One cron entry:
+### Hermes cron delivery
 
-```
-5 * * * *    news-monitor check
-```
+Use the existing hourly gate and attach the updated `news-monitor` skill.
+On the Hermes host, confirm that `hermes -p stock-analyst send --help` is
+available. In the cron agent's shell environment, set
+`NEWS_MONITOR_DELIVERY_TARGET` to the job's existing delivery destination
+in Hermes send format (for example, `telegram:<chat_id>:<thread_id>`). If the
+job uses `origin`, use the explicit platform, chat, and thread it resolves to.
+Keep `NEWS_MONITOR_DB` the same for the gate and the agent.
+
+Update the existing cron prompt's delivery instructions to follow the skill's
+scheduled loop. Have the agent call `news-monitor deliver --item <id>` with
+the digest on stdin and the exact included IDs. Have it return `[SILENT]`
+after success or a quiet run. Keep the original cron destination for operational
+notices, including delivery failure.
+
+The ledger is updated after the sender succeeds. A crash or timeout after the
+platform accepts a message but before the ledger commits can cause a repeat.
 
 ## Layout
 
@@ -115,16 +129,16 @@ pending for retry. `status: partial` and `scope_filter.failures` expose these
 failures; `runs.detail` retains them. Authentication/configuration errors stop
 further calls for that run. Errors contain no API response body or key.
 
-Each check examines up to `--limit` pending items (default 40), which bounds
-classification work; exclusions can make the returned batch smaller. The SDK
+Each check classifies up to `--limit` unclassified items (default 40). It
+then returns up to the same limit of classified, in-scope pending items. The SDK
 uses a 20-second request timeout, at most three attempts, and a 60-second retry
 budget per story. No calls are made for absorbed history or dry runs.
 `pending_items` includes news awaiting a decision; `awaiting_scope` counts it.
-`items --pending` and `mark --all` cover only classified, in-scope news.
+`items --pending` and `mark --all` cover only classified, in-scope pending news.
 `items` without `--pending` is history and may include unclassified rows
 or exclusions retained by older versions: never use it as a reporting batch.
 
-Existing databases gain two nullable columns on connection. History is retained;
-previously pending stories receive classification on subsequent checks.
+Existing databases gain missing scope columns and `discarded_at` on connection.
+Discarded stories stay in history with their fingerprints and leave the pending queue.
 
 API contract: https://docs.typesafe.ai/api

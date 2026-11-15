@@ -50,6 +50,10 @@ def db_path() -> Path:
     return Path(os.environ.get("NEWS_MONITOR_DB", str(DEFAULT_DB_PATH))).expanduser()
 
 
+def delivery_target() -> str | None:
+    return os.environ.get("NEWS_MONITOR_DELIVERY_TARGET", "").strip() or None
+
+
 def timezone() -> ZoneInfo:
     return ZoneInfo(os.environ.get("NEWS_MONITOR_TZ", DEFAULT_TZ))
 

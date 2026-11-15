@@ -49,33 +49,34 @@ and unset by default. See the triage section.
 ```
 
 Hourly, five past. `check` fetches every enabled feed, stores what is new and
-returns in-scope news that has never been reported — often nothing, which is the normal case
-and warrants no message at all.
+returns pending in-scope news. A quiet check needs no message.
 
-The schedule and the ledger are independent. A missed run needs no catch-up: the
-next one returns everything still pending, because "not yet reported" is a
-column, not a time window.
+The ledger carries pending items across missed runs. Each check returns up to
+the configured limit, beginning with the oldest items.
 
 ## The loop, per run
 
-1. **`news-monitor check`.** Read `items` — oldest first, already deduplicated
-   across feeds and classified as in scope by JEV. `scope` carries the decision
-   and confidence. Its `reason` is a fixed label, not a generated explanation.
-   Report only `check.items`; unfiltered `items` is audit history.
-2. **Bucket them.** Each item carries `category` (the feed's own) and
-   `sector_hints` / `signals` (matched keywords). Group by what the desk cares
-   about — rates and inflation together, one name's news together — not by
-   which feed carried it.
-3. **Write one or two lines per item, each carrying its `url`.** The link is not
-   optional: it is the only route from your summary to the article, and you have
-   not read the article.
-4. **Consider the vault** (below) before moving on.
-5. **`news-monitor mark --item <id>`**, *after* the item has actually been
-   reported. One at a time, after its own send.
+1. **Read the gate's `news-monitor check` JSON.** Report a gate failure as an
+   operational alert. For a manual check, run `news-monitor check` yourself.
+   Use `items` as the reporting batch. Its rows are oldest first, deduplicated,
+   and classified by JEV.
+2. **Decide what to include.** Call `news-monitor discard --item <id>` for
+   each intentionally omitted headline. Repeat `--item` to handle several in
+   one call. Keep any item you could not assess pending for retry.
+3. **Write the digest.** Group by what the desk cares about. Use one or two lines
+   per included item and put its original `url` in the digest.
+4. **On the scheduled run, send and acknowledge together.** Pass the digest
+   on stdin to `news-monitor deliver --item <id>`, repeating `--item`
+   for exactly the included IDs. Use the same ledger as the gate. After
+   successful delivery, consider the vault (below) for the delivered items,
+   then return only `[SILENT]` to suppress the scheduler's second send.
+5. **Handle quiet and failed runs.** If there is no digest or operational alert,
+   return only `[SILENT]`. If delivery fails, leave the digest IDs pending
+   and return a short failure notice without the digest. Report operational
+   alerts through the normal cron response when there is no digest to send.
 
-Mark after, not before. A batch stamped up front loses everything after a
-failure; a batch stamped at the end re-sends what already arrived. `mark` on an
-already-stamped item is not an error, so a retry is safe.
+For manual sends with a confirmed receipt, use `news-monitor mark --item <id>`
+for the exact IDs that went out.
 
 ## Writing the lines
 
@@ -90,9 +91,9 @@ You have the headline and the publisher's own header paragraph — `summary`.
   link is where the reader gets it.
 - **One line is a complete answer.** Most wire items are one line. Two lines is
   for something that changes a position.
-- **An item that says nothing gets dropped, not padded.** Personal-finance
-  columns, "five stocks to watch", and syndicated opinion reach these feeds
-  constantly. Say the run was quiet rather than writing up filler.
+- **Discard filler.** Personal-finance columns, "five stocks to watch", and
+  syndicated opinion reach these feeds constantly. Record editorial drops with
+  `discard`.
 - **Empty `sector_hints` does not mean unimportant.** It means the headline's
   words are not in the keyword list. Read it yourself.
 
@@ -141,9 +142,8 @@ guess at to write a sentence about.
 desk-wiki --title "<headline>" --tags "<sector_hints>" --source "<url>"
 ```
 
-Never inject an item you have not reported, and never inject one twice — the
-ledger tracks reporting, not vault writes, so a re-run after a failed `mark`
-will offer the same item again. Check the vault before writing on a retry.
+Inject only items whose delivery was confirmed. Check the vault before writing
+on a retry because the ledger tracks reporting separately from vault writes.
 
 ## Adding a source — only when the operator asks
 

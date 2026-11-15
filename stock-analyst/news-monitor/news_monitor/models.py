@@ -114,6 +114,7 @@ class Item:
     first_seen_at: str
     reported_at: str | None
     scope: dict | None = None
+    discarded_at: str | None = None
 
     @classmethod
     def from_row(cls, row) -> "Item":
@@ -130,6 +131,7 @@ class Item:
             signals=_split(row["signals"]),
             first_seen_at=row["first_seen_at"],
             reported_at=row["reported_at"],
+            discarded_at=row["discarded_at"],
             scope=json.loads(row["scope_detail"]) if row["scope_detail"] else None,
         )
 
@@ -146,6 +148,7 @@ class Item:
             "signals": self.signals,
             "first_seen_at": self.first_seen_at,
             "reported_at": self.reported_at,
+            "discarded_at": self.discarded_at,
             "scope": self.scope,
         }
 

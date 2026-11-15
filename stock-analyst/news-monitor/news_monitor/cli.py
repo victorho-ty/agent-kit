@@ -19,13 +19,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
+import subprocess
 import sys
 from urllib.parse import urlsplit
 
 from . import check as check_run
 from . import clock, db, gate, settings
 from .config import load_seeds, load_taxonomy
-from .errors import CandidateError, ConfigError, ExitCode, NewsMonitorError, NotFoundError
+from .errors import (
+    CandidateError, ConfigError, DatabaseError, DeliveryError, ExitCode, NewsMonitorError,
+    NotFoundError,
+)
 
 
 def _emit(payload: dict) -> None:
@@ -82,15 +87,23 @@ def build_parser() -> argparse.ArgumentParser:
     disable = sub.add_parser("disable", help="Turn a feed off. It is never deleted.")
     disable.add_argument("--feed", required=True, help="Name or url.")
 
-    mark = sub.add_parser("mark", help="Stamp items as reported, after they have been written up.")
+    mark = sub.add_parser("mark", help="Acknowledge items after a confirmed external send.")
     mark.add_argument("--item", action="append", dest="items",
                       help="Repeatable. A row id or a fingerprint.")
     mark.add_argument("--all", action="store_true",
                       help="Every pending item. Use only when the whole batch went out.")
 
+    discard = sub.add_parser("discard", help="Retire in-scope items intentionally omitted.")
+    discard.add_argument("--item", action="append", dest="items", required=True,
+                         help="Repeatable. A row id or a fingerprint.")
+
+    deliver = sub.add_parser("deliver", help="Send a digest from stdin and mark its items on success.")
+    deliver.add_argument("--item", action="append", dest="items", type=int, required=True,
+                         help="Repeatable. A check.items row id included in the digest.")
+
     items = sub.add_parser("items", help="What has been seen, newest first.")
     items.add_argument("--feed", action="append", dest="feeds")
-    items.add_argument("--pending", action="store_true", help="Only items not yet reported.")
+    items.add_argument("--pending", action="store_true", help="Only items waiting to be reported.")
     items.add_argument("--reported", action="store_true", help="Only items already reported.")
     items.add_argument("--since", help="ISO date or timestamp; filters on first_seen_at.")
     items.add_argument("--limit", type=int, default=20)
@@ -123,8 +136,8 @@ def _dispatch(args) -> int:
         return _cmd_add(args, conn, now)
     if args.command in ("enable", "disable"):
         return _cmd_set_state(args, conn, now, enabled=args.command == "enable")
-    if args.command == "mark":
-        return _cmd_mark(args, conn, now)
+    if args.command in ("mark", "discard", "deliver"):
+        return _cmd_dispose(args, conn, now)
     if args.command == "items":
         return _cmd_items(args, conn)
     _emit({"ok": True, "runs": db.recent_runs(conn, args.limit), **db.pending_count(conn)})
@@ -249,30 +262,99 @@ def _cmd_set_state(args, conn, now, *, enabled: bool) -> int:
     return int(ExitCode.OK)
 
 
+def _cmd_dispose(args, conn, now) -> int:
+    body = ""
+    if args.command == "deliver":
+        body = sys.stdin.read().strip() if not sys.stdin.isatty() else ""
+        if not body:
+            raise ConfigError("deliver needs a digest on stdin")
+        if "MEDIA:" in body.upper():
+            raise ConfigError("deliver accepts digest text only")
+
+    try:
+        with conn:
+            # Keep eligibility and the final write in one transaction so a
+            # concurrent delivery or discard cannot act on the same item.
+            conn.execute("BEGIN IMMEDIATE")
+            if args.command == "deliver":
+                return _cmd_deliver(args, conn, body)
+            if args.command == "discard":
+                return _cmd_discard(args, conn, now)
+            return _cmd_mark(args, conn, now)
+    except sqlite3.Error as exc:
+        raise DatabaseError("could not update the news ledger", action=args.command) from exc
+
+
+def _resolve_items(conn, references):
+    items = {}
+    for reference in references:
+        item = db.resolve_item(conn, str(reference))
+        if item is None:
+            raise NotFoundError(f"no item matching {reference!r}", reference=reference)
+        if item.reported_at is None and not (item.scope and item.scope["is_target_scope"]):
+            raise ConfigError("item has not passed JEV scope classification", item_id=item.id)
+        items[item.id] = item
+    return list(items.values())
+
+
 def _cmd_mark(args, conn, now) -> int:
     if not args.items and not args.all:
         raise NotFoundError("mark needs --item <id> (repeatable) or --all")
+    items = db.pending_items(conn, classified=True) if args.all else _resolve_items(conn, args.items)
+    return _mark_items(conn, items, now)
 
-    if args.all:
-        wanted = [item.id for item in db.pending_items(conn, classified=True)]
-    else:
-        wanted = []
-        for reference in args.items:
-            item = db.resolve_item(conn, reference)
-            if item is None:
-                raise NotFoundError(f"no item matching {reference!r}", reference=reference)
-            if item.reported_at is None and not (item.scope and item.scope["is_target_scope"]):
-                raise ConfigError("item has not passed JEV scope classification", item_id=item.id)
-            wanted.append(item.id)
 
+def _mark_items(conn, items, now) -> int:
+    wanted = [item.id for item in items if item.discarded_at is None]
     stamped = db.mark_reported(conn, wanted, now)
     _emit({
         "ok": True,
         "marked": stamped,
-        "already_marked": [item_id for item_id in wanted if item_id not in stamped],
+        "already_marked": [item.id for item in items if item.reported_at is not None],
+        "already_discarded": [item.id for item in items if item.discarded_at is not None],
         **db.pending_count(conn),
     })
     return int(ExitCode.OK)
+
+
+def _cmd_discard(args, conn, now) -> int:
+    items = _resolve_items(conn, args.items)
+    discarded = db.discard_items(conn, [item.id for item in items], now)
+    _emit({
+        "ok": True,
+        "discarded": discarded,
+        "already_discarded": [item.id for item in items if item.discarded_at is not None],
+        "already_marked": [item.id for item in items if item.reported_at is not None],
+        **db.pending_count(conn),
+    })
+    return int(ExitCode.OK)
+
+
+def _cmd_deliver(args, conn, body: str) -> int:
+    items = _resolve_items(conn, args.items)
+    pending = [item for item in items if item.reported_at is None and item.discarded_at is None]
+    if all(item.reported_at is not None for item in items):
+        return _mark_items(conn, items, clock.now(settings.timezone()))
+    if len(pending) != len(items):
+        raise ConfigError("rebuild the digest using only pending items",
+                          pending_ids=[item.id for item in pending])
+    missing_urls = [item.id for item in items if item.url not in body]
+    if missing_urls:
+        raise ConfigError("digest is missing item URLs", item_ids=missing_urls)
+
+    target = settings.delivery_target()
+    if not target:
+        raise ConfigError("set NEWS_MONITOR_DELIVERY_TARGET to the cron job's destination")
+    try:
+        result = subprocess.run(
+            ["hermes", "-p", "stock-analyst", "send", "--to", target, "--file", "-", "--quiet"],
+            input=body.encode("utf-8"), capture_output=True, timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise DeliveryError("Hermes did not confirm delivery", reason=type(exc).__name__) from exc
+    if result.returncode:
+        raise DeliveryError("Hermes send failed", sender_exit_code=result.returncode)
+    return _mark_items(conn, items, clock.now(settings.timezone()))
 
 
 def _cmd_items(args, conn) -> int:

@@ -7,9 +7,8 @@ Three tables, three jobs:
   the database; this one cannot, because ``add`` writes sources at run time and
   a file the tools also wrote would be a second truth that drifts. ``enabled``
   is a column here rather than a key in a file for exactly that reason.
-* **item** -- every headline ever seen. ``reported_at`` doubles as the ledger,
-  so there is no second table to keep in sync: an item is pending when it has
-  not been stamped and has not been excluded by JEV.
+* **item** -- the headlines and their reporting ledger. Pending items have
+  neither a reporting nor an editorial discard timestamp.
 * **runs** -- one row per check including the failures, which is the agent's
   whole triage surface. It never parses stdout.
 
@@ -66,7 +65,8 @@ CREATE TABLE IF NOT EXISTS item (
   reported_at     TEXT,                   -- reporting ledger; scope_target governs eligibility
   run_id          INTEGER,
   scope_target    INTEGER,
-  scope_detail    TEXT
+  scope_detail    TEXT,
+  discarded_at    TEXT
 );
 
 CREATE INDEX IF NOT EXISTS item_pending ON item (reported_at);
@@ -101,8 +101,11 @@ def connect(path: Path | str | None = None) -> sqlite3.Connection:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(SCHEMA)
+        conn.execute("BEGIN IMMEDIATE")
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(item)")}
-        for name, kind in (("scope_target", "INTEGER"), ("scope_detail", "TEXT")):
+        for name, kind in (
+            ("scope_target", "INTEGER"), ("scope_detail", "TEXT"), ("discarded_at", "TEXT"),
+        ):
             if name not in columns:
                 conn.execute(f"ALTER TABLE item ADD COLUMN {name} {kind}")
         conn.commit()
@@ -316,7 +319,7 @@ def pending_items(
     """
     if classified and unclassified:
         raise ValueError("classified and unclassified are mutually exclusive")
-    sql = "SELECT * FROM item WHERE reported_at IS NULL"
+    sql = "SELECT * FROM item WHERE reported_at IS NULL AND discarded_at IS NULL"
     if unclassified:
         sql += " AND scope_target IS NULL"
     elif classified:
@@ -357,7 +360,8 @@ def mark_reported(conn: sqlite3.Connection, item_ids: list[int], now: datetime) 
     stamped = []
     for item_id in item_ids:
         cursor = conn.execute(
-            "UPDATE item SET reported_at = ? WHERE id = ? AND reported_at IS NULL AND scope_target = 1",
+            """UPDATE item SET reported_at = ?
+               WHERE id = ? AND reported_at IS NULL AND discarded_at IS NULL AND scope_target = 1""",
             (now.isoformat(), item_id),
         )
         if cursor.rowcount:
@@ -366,10 +370,26 @@ def mark_reported(conn: sqlite3.Connection, item_ids: list[int], now: datetime) 
     return stamped
 
 
+def discard_items(conn: sqlite3.Connection, item_ids: list[int], now: datetime) -> list[int]:
+    """Retire intentionally omitted news while retaining its fingerprint."""
+    discarded = []
+    for item_id in item_ids:
+        cursor = conn.execute(
+            """UPDATE item SET discarded_at = ?
+               WHERE id = ? AND reported_at IS NULL AND discarded_at IS NULL AND scope_target = 1""",
+            (now.isoformat(), item_id),
+        )
+        if cursor.rowcount:
+            discarded.append(item_id)
+    conn.commit()
+    return discarded
+
+
 def pending_count(conn: sqlite3.Connection) -> dict:
     row = conn.execute("""SELECT COUNT(*) AS pending,
         SUM(CASE WHEN scope_target IS NULL THEN 1 ELSE 0 END) AS awaiting
-        FROM item WHERE reported_at IS NULL AND (scope_target IS NULL OR scope_target = 1)""").fetchone()
+        FROM item WHERE reported_at IS NULL AND discarded_at IS NULL
+           AND (scope_target IS NULL OR scope_target = 1)""").fetchone()
     return {"pending_items": row["pending"], "awaiting_scope": row["awaiting"] or 0}
 
 
@@ -392,7 +412,7 @@ def recent_items(
         clauses.append("first_seen_at >= ?")
         params.append(since)
     if state == "pending":
-        clauses.append("reported_at IS NULL AND scope_target = 1")
+        clauses.append("reported_at IS NULL AND discarded_at IS NULL AND scope_target = 1")
     elif state == "reported":
         clauses.append("reported_at IS NOT NULL")
     where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
@@ -406,7 +426,8 @@ def feed_counts(conn: sqlite3.Connection) -> dict[str, dict]:
     rows = conn.execute(
         """SELECT feed,
                   COUNT(*) AS items,
-                  SUM(CASE WHEN reported_at IS NULL AND (scope_target IS NULL OR scope_target = 1) THEN 1 ELSE 0 END) AS pending,
+                  SUM(CASE WHEN reported_at IS NULL AND discarded_at IS NULL
+                       AND (scope_target IS NULL OR scope_target = 1) THEN 1 ELSE 0 END) AS pending,
                   MAX(first_seen_at) AS latest_seen_at
              FROM item GROUP BY feed"""
     ).fetchall()

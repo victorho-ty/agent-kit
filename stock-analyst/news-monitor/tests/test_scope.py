@@ -180,7 +180,11 @@ def test_dry_run_does_not_classify_pending_items(conn, now, taxonomy):
 
 def test_existing_ledger_upgrade_is_additive_and_idempotent(tmp_path):
     path = tmp_path / "old.db"
-    old_schema = db.SCHEMA.replace("  run_id          INTEGER,\n  scope_target    INTEGER,\n  scope_detail    TEXT", "  run_id          INTEGER")
+    old_schema = db.SCHEMA.replace(
+        "  run_id          INTEGER,\n  scope_target    INTEGER,\n"
+        "  scope_detail    TEXT,\n  discarded_at    TEXT",
+        "  run_id          INTEGER",
+    )
     with sqlite3.connect(path) as conn:
         conn.executescript(old_schema)
         conn.execute("""INSERT INTO item (fingerprint, feed, feed_category, title, url, first_seen_at)
@@ -189,7 +193,9 @@ def test_existing_ledger_upgrade_is_additive_and_idempotent(tmp_path):
         conn = db.connect(path)
         try:
             assert db.resolve_item(conn, "story").title == "headline"
-            assert db.resolve_item(conn, "story").scope is None
+            item = db.resolve_item(conn, "story")
+            assert item.scope is None
+            assert item.discarded_at is None
         finally:
             conn.close()
 
@@ -224,6 +230,27 @@ def test_unclassified_items_are_not_starved_by_older_included_backlog(conn, now,
     assert calls[-1] == "new-40"
     assert len(calls) == 41
     assert again["awaiting_scope"] == 0
+
+
+def test_discarded_headline_leaves_pending_window_and_stays_deduplicated(conn, now, taxonomy):
+    filler = insert(conn, now, "filler")
+    newer = insert(conn, now, "newer")
+    decision = scope.Decision("include", 0.8, "jev-test").to_dict()
+    for item_id in (filler, newer):
+        db.record_scope(conn, item_id, decision)
+
+    before = check.check(conn, taxonomy, [], now, limit=1)
+    assert [item["id"] for item in before["items"]] == [filler]
+
+    assert db.discard_items(conn, [filler], now) == [filler]
+    assert db.mark_reported(conn, [filler], now) == []
+    assert insert(conn, now, "filler") is None
+    assert db.resolve_item(conn, str(filler)).discarded_at == now.isoformat()
+    assert db.feed_counts(conn)["wire"]["pending"] == 1
+
+    after = check.check(conn, taxonomy, [], now, limit=1)
+    assert [item["id"] for item in after["items"]] == [newer]
+    assert after["pending_items"] == 1
 
 
 def test_classification_budget_drains_excluded_backlog(conn, now, taxonomy):

@@ -229,7 +229,7 @@ def _yield_status(feed, entries) -> str:
 
 def _classify_pending(conn, limit, classifier) -> dict:
     report = {"classified": 0, "included": 0, "excluded": 0, "excluded_items": [], "failures": []}
-    candidates = [item for item in db.pending_items(conn, limit=limit) if item.scope is None]
+    candidates = db.pending_items(conn, limit=limit, unclassified=True)
     if not candidates:
         return report
     owned = classifier is None

@@ -306,6 +306,7 @@ def pending_items(
     limit: int | None = None,
     *,
     classified: bool = False,
+    unclassified: bool = False,
 ) -> list[Item]:
     """Everything not yet handed over, oldest first so a backlog drains in order.
 
@@ -313,8 +314,15 @@ def pending_items(
     defined by the ledger, not by the clock, which is why a missed cron run
     costs nothing and a caught-up one repeats nothing.
     """
+    if classified and unclassified:
+        raise ValueError("classified and unclassified are mutually exclusive")
     sql = "SELECT * FROM item WHERE reported_at IS NULL"
-    sql += " AND scope_target = 1" if classified else " AND (scope_target IS NULL OR scope_target = 1)"
+    if unclassified:
+        sql += " AND scope_target IS NULL"
+    elif classified:
+        sql += " AND scope_target = 1"
+    else:
+        sql += " AND (scope_target IS NULL OR scope_target = 1)"
     params: list = []
     if feed_names is not None:
         if not feed_names:

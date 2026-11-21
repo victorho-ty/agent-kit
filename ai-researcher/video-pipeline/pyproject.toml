@@ -1,0 +1,35 @@
+[project]
+name = "video-pipeline"
+version = "0.1.0"
+description = "Hermes-driven news shorts with llama.cpp generation and adapted Verticals rendering"
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4>=4.12",
+    "Pillow>=10.4",
+    "edge-tts>=7.2",
+    "PyYAML>=6"
+]
+
+[project.optional-dependencies]
+youtube = ["google-api-python-client>=2.150", "google-auth-oauthlib>=1.2"]
+
+[project.scripts]
+video-pipeline = "video_pipeline.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["video_pipeline*"]
+
+[tool.setuptools.data-files]
+"share/video-pipeline/skills/video-pipeline" = ["skills/video-pipeline/SKILL.md"]
+"share/video-pipeline/skills/video-pipeline/references" = ["skills/video-pipeline/references/workflow.md"]
+"share/video-pipeline" = ["THIRD_PARTY_NOTICES.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.8"]

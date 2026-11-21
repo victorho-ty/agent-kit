@@ -1,0 +1,7 @@
+.env
+config.yaml
+work/
+artifacts/
+*.sqlite3*
+*.token.json
+client_secret*.json

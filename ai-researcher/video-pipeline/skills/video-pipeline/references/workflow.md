@@ -24,7 +24,10 @@ does not install model weights, change Hermes config, or register jobs.
 
 ## Selecting models
 
-Cloud: `draft --job ID --generator hermes`. Returned JSON contains request_id,
+The skill writes and directs with the current Hermes profile model and fact-checks
+with the local llama.cpp model. Keep both routes available.
+
+Hermes: `draft --job ID --generator hermes`. Returned JSON contains request_id,
 system and payload. Current Hermes profile model generates output itself. It
 returns `{ "request_id": "exact returned ID", "output": { ... } }` via --input.
 Keep response files inside job directory. No cloud endpoint/key/model is stored.
@@ -33,7 +36,7 @@ Changing Hermes profile model changes the next Hermes task automatically.
 Local: set `VIDEO_LLAMA_URL=http://127.0.0.1:8080/v1` and optionally
 `VIDEO_LLAMA_MODEL` (server model ID/alias). If omitted, `/v1/models` must advertise
 exactly one model. `video-pipeline models` checks selection. Use
-`draft --job ID --generator llama-cpp`. Set token only through environment variable
+`review --job ID --generator llama-cpp`. Set token only through environment variable
 `VIDEO_LLAMA_API_KEY` if server requires it. Endpoint must be reachable from
 Hermes terminal backend: localhost inside Docker refers to that container.
 llama.cpp needs a chat template and JSON response_format support. Increase
@@ -87,6 +90,29 @@ Set config font to installed TTF/OTF supporting requested language (e.g. Noto CJ
 Caption timing is estimated by character count inside measured scene duration;
 inspect sync. No forced translation: draft task writes requested language.
 
+### Visual direction
+
+After factual review passes, use the Hermes profile model to plan graphics
+against the approved narration. Save a storyboard in the job directory. For
+each scene, record its spoken cue, what the viewer should understand, the
+subject and composition, and the asset type. Plan a sequence that progresses
+with the story, such as a concrete opening subject, a diagram of how it works,
+and a side-by-side showing what changed. Keep a consistent palette and leave
+room for captions. Use only approved facts, including labels and numbers.
+
+Create diagrams, timelines, and comparisons as programmatic graphics with
+precise labels. For illustrations, use the configured Hermes Image Generation
+tool when available. Its own backend generates the image from Hermes's prompt.
+Save or copy the results into the job directory and inspect them before rendering.
+For a missing illustration, create a programmatic graphic that explains the
+same beat. Report any scene that could only use a caption card.
+
+Write an assets JSON array of absolute local image paths in approved scene
+order. The renderer supports one still per scene with pan/zoom. Plan separate
+scenes in the draft for separate cuts or reveal beats. If the storyboard requires
+a new scene break after review, revise the draft and get it reviewed again.
+Use spoken cues for planning and let measured narration determine cut times.
+
 `status --job ID` returns render_hash, draft and artifact paths. Inspect scene
 frame-N.png, narration.wav, captions.srt and video.mp4. Visual review file:
 
@@ -123,7 +149,7 @@ any new publication; this bundle intentionally has no reset/delete shortcut.
 ## Scheduling
 
 When requested, attach video-pipeline skill to Hermes cron using current supported
-cron tool/CLI. Include absolute data/config paths and chosen text generator in prompt.
+cron tool/CLI. Include absolute data/config paths in the prompt.
 Leave model/provider unset to inherit profile configuration. Gateway must remain
 running; cron platform needs terminal/files/web/media tools and same executable PATH.
 No jobs are installed by this bundle. SQLite serializes mutations per data directory;

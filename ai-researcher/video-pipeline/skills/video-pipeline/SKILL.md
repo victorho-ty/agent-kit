@@ -1,6 +1,6 @@
 ---
 name: video-pipeline
-description: Make sourced news shorts with Hermes or llama.cpp.
+description: Direct sourced news shorts with Hermes and llama.cpp review.
 ---
 
 # Video pipeline
@@ -21,22 +21,23 @@ Read [workflow reference](references/workflow.md) for JSON contracts and deploym
    evidence. Run `create --topic TEXT --language en --url ARTICLE_URL` (repeat URL),
    or import tool-returned article evidence with `--evidence FILE`. An existing
    job means resume it; never duplicate its publication. All commands emit JSON.
-2. Choose text generator requested by user: `hermes` (default) or `llama-cpp`.
-   Run `draft --job ID --generator ROUTE`. For `hermes`, read returned task and
-   perform it yourself with profile's currently configured model. Write response
-   to returned response_path, then submit via same command plus `--input FILE`.
-   No fixed cloud provider, model, key or separate cloud session. For `llama-cpp`,
-   backend calls configured local endpoint and validates JSON directly.
-3. Run `review --job ID` using returned opposite route. When it returns a Hermes
-   task, use current profile model and submit matching request_id/output response.
-   Writer and reviewer must be different underlying models: if profile itself uses
-   same llama.cpp model, report that limitation instead of claiming independence.
-   Rejected drafts may be revised, at most three drafts total. Stop after budget.
-4. Run `render --job ID`. Default narration is online Edge TTS. For local/external
-   narration use `--audio FILE`; for image scenes use `--assets FILE`. Both list
-   one path per scene. Without images, renderer produces explicit caption cards.
-   llama.cpp chat generates text; it does not synthesize images or narration.
-5. Run `status --job ID`. Inspect returned scene frames, full narration/video and
+2. **Hermes writes.** Run `draft --job ID --generator hermes`. Use the current
+   profile model to choose the story angle, write narration, and split it into
+   distinct visual beats. Submit the response at the returned path with the same
+   command plus `--input FILE`. Use one scene per meaningful visual change.
+3. **Local llama.cpp checks facts.** Run `review --job ID --generator llama-cpp`.
+   Confirm the profile and local server use different underlying models. If
+   review rejects, revise with Hermes and submit for local review again, within
+   the three-draft limit. For a resumed llama.cpp draft that still needs review,
+   create a Hermes revision on the same job before using the local reviewer.
+4. **Hermes directs and creates graphics after review passes.** Use the current
+   profile model to create the storyboard and graphics using the
+   [visual direction procedure](references/workflow.md#visual-direction).
+   Save one usable portrait graphic per approved scene and pass their paths in
+   order to `render --job ID --assets FILE`. Use online Edge TTS for narration
+   or add `--audio FILE` with one supplied narration clip per scene. Python and
+   FFmpeg handle timing and composition.
+5. **Hermes checks the result.** Run `status --job ID`. Inspect returned scene frames, full narration/video and
    captions with available media tools. Check readability, clipping, relevance,
    pronunciation and sync. Record honest visual/editorial verdict with current
    render_hash. Run `qc --job ID --visual-review FILE`. Failed QC never permits
